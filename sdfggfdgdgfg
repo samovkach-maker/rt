@@ -1,0 +1,176 @@
+-- ПОИСК УЯЗВИМОСТЕЙ В ПЕРЧАТКЕ BOUNTY
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local results = ""
+local slapsStart = 0
+local ls = LocalPlayer:FindFirstChild("leaderstats")
+local slapsObj = ls and ls:FindFirstChild("Slaps")
+if slapsObj then slapsStart = slapsObj.Value end
+
+local function getSlaps()
+    if slapsObj then return slapsObj.Value end
+    return 0
+end
+
+local function findRemote(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteEvent") then return obj end
+    end
+    return nil
+end
+
+local function findFunction(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteFunction") then return obj end
+    end
+    return nil
+end
+
+results = "=== УЯЗВИМОСТИ ПЕРЧАТКИ BOUNTY ===\n\n"
+results = results .. "Слапы до: " .. slapsStart .. "\n\n"
+
+local char = LocalPlayer.Character
+local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+-- 1. Все эвенты со словом Bounty
+results = results .. "--- BOUNTY ЭВЕНТЫ ---\n"
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj.Name:lower():find("bounty") then
+        results = results .. obj.ClassName .. ": " .. obj:GetFullName() .. "\n"
+    end
+end
+
+-- 2. Пробуем BountyResponse с разными аргументами
+results = results .. "\n--- BOUNTYRESPONSE ТЕСТ ---\n"
+local br = findRemote("BountyResponse")
+if br then
+    local testArgs = {
+        {5}, {"5"}, {"+5"}, {"add", 5}, {"claim"}, {"collect"},
+        {LocalPlayer}, {LocalPlayer, 5}, {LocalPlayer, "claim"},
+        {"convert"}, {"cashout"}, {"redeem"}, {"slaps"}, {"reward"},
+        {100}, {1000}, {-5}, {0}
+    }
+    
+    for _, args in ipairs(testArgs) do
+        local before = getSlaps()
+        pcall(function() br:FireServer(unpack(args)) end)
+        task.wait(0.1)
+        local after = getSlaps()
+        if after > before then
+            results = results .. "✅ Аргументы ("
+            for i, a in ipairs(args) do results = results .. tostring(a) .. " " end
+            results = results .. ") дали +" .. (after - before) .. " слапов!\n"
+        end
+    end
+end
+
+-- 3. Пробуем Events.BountyResponse
+results = results .. "\n--- EVENTS.BOUNTYRESPONSE ---\n"
+local ebr = findRemote("BountyResponse") -- Ищем в Events
+if ebr and ebr ~= br then
+    local testArgs = {{5}, {"claim"}, {"collect"}, {LocalPlayer, "claim"}}
+    for _, args in ipairs(testArgs) do
+        local before = getSlaps()
+        pcall(function() ebr:FireServer(unpack(args)) end)
+        task.wait(0.1)
+        local after = getSlaps()
+        if after > before then
+            results = results .. "✅ Аргументы дали +" .. (after - before) .. " слапов!\n"
+        end
+    end
+end
+
+-- 4. Пробуем команды
+results = results .. "\n--- КОМАНДЫ ---\n"
+local cmd = findRemote("Command")
+if cmd then
+    local commands = {
+        {"bounty", "claim"}, {"/bounty", "cashout"}, {"bountyclaim"},
+        {"claimbounty"}, {"bounty", "slaps"}, {"convertbounty"}
+    }
+    for _, cmdArgs in ipairs(commands) do
+        local before = getSlaps()
+        pcall(function() cmd:FireServer(unpack(cmdArgs)) end)
+        task.wait(0.1)
+        local after = getSlaps()
+        if after > before then
+            results = results .. "✅ Команда " .. cmdArgs[1] .. " дала +" .. (after - before) .. "\n"
+        end
+    end
+end
+
+-- 5. Манипуляции с баунти на персонаже
+results = results .. "\n--- МАНИПУЛЯЦИИ С АТРИБУТАМИ ---\n"
+if char then
+    -- Пробуем установить баунти в 0
+    local attrs = {"Bounty", "bounty", "Bounti", "bounti"}
+    for _, attr in ipairs(attrs) do
+        local before = getSlaps()
+        pcall(function() char:SetAttribute(attr, 0) end)
+        pcall(function() char:SetAttribute(attr, -1000) end)
+        task.wait(0.1)
+        local after = getSlaps()
+        if after > before then
+            results = results .. "✅ Сброс " .. attr .. " дал +" .. (after - before) .. " слапов!\n"
+        end
+    end
+    
+    -- Ищем все IntValue на персонаже
+    for _, obj in pairs(char:GetDescendants()) do
+        if obj:IsA("IntValue") or obj:IsA("NumberValue") then
+            if obj.Name:lower():find("bounty") then
+                results = results .. "Найден: " .. obj:GetFullName() .. " = " .. obj.Value .. "\n"
+                local before = getSlaps()
+                local oldVal = obj.Value
+                obj.Value = 0
+                task.wait(0.1)
+                local after = getSlaps()
+                if after > before then
+                    results = results .. "  ✅ Обнуление дало +" .. (after - before) .. " слапов!\n"
+                end
+                obj.Value = oldVal
+            end
+        end
+    end
+end
+
+-- 6. Пробуем через HumanoidDied (симуляция что нас убили)
+results = results .. "\n--- СИМУЛЯЦИЯ СМЕРТИ ---\n"
+local hd = findRemote("HumanoidDied")
+if hd and char then
+    local before = getSlaps()
+    pcall(function() hd:FireServer(char) end)
+    task.wait(0.3)
+    local after = getSlaps()
+    if after > before then
+        results = results .. "✅ HumanoidDied дал +" .. (after - before) .. " слапов!\n"
+    end
+end
+
+-- 7. Пробуем KillsUpdated
+local ku = findRemote("KillsUpdated")
+if ku then
+    local before = getSlaps()
+    pcall(function() ku:FireServer(LocalPlayer, 1) end)
+    task.wait(0.1)
+    local after = getSlaps()
+    if after > before then
+        results = results .. "✅ KillsUpdated дал +" .. (after - before) .. " слапов!\n"
+    end
+end
+
+-- Итог
+local slapsEnd = getSlaps()
+results = results .. "\n=== ИТОГ ==="
+results = results .. "\nСлапы: " .. slapsStart .. " → " .. slapsEnd
+if slapsEnd > slapsStart then
+    results = results .. " (+" .. (slapsEnd - slapsStart) .. ")"
+else
+    results = results .. " (нет изменений)"
+end
+
+setclipboard(results)
+print(results)
+print("\nСкопировано в буфер! Ctrl+V")
