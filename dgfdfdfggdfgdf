@@ -1,0 +1,237 @@
+-- РАСШИФРОВКА КОНКРЕТНОГО UUID ЭВЕНТА
+-- Запусти, нажми СТАРТ, ударь 1 раз, смотри что внутри Table(3)
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local logLines = {}
+local MAX_LINES = 100
+local recording = false
+local startTime = 0
+
+local function log(cat, msg)
+    local t = string.format("%.3f", tick() - startTime)
+    local line = "[" .. t .. "][" .. cat .. "] " .. tostring(msg)
+    table.insert(logLines, line)
+    if #logLines > MAX_LINES then table.remove(logLines, 1) end
+    pcall(function()
+        OutputLabel.Text = table.concat(logLines, "\n")
+    end)
+end
+
+-- Расшифровка таблицы ЛЮБЫМ способом
+local function decodeTable(tbl, depth)
+    depth = depth or 0
+    if depth > 6 then return "...(maxdepth)" end
+    if type(tbl) ~= "table" then
+        return tostring(tbl) .. "<" .. typeof(tbl) .. ">"
+    end
+    
+    local result = ""
+    
+    -- Способ 1: pairs
+    pcall(function()
+        for k, v in pairs(tbl) do
+            local vs = type(v) == "table" and "{" .. decodeTable(v, depth + 1) .. "}" or tostring(v) .. "<" .. typeof(v) .. ">"
+            result = result .. " [" .. tostring(k) .. "]=" .. vs
+        end
+    end)
+    
+    -- Способ 2: индексы
+    if result == "" then
+        pcall(function()
+            for i = 1, 20 do
+                local v = tbl[i]
+                if v == nil then break end
+                local vs = type(v) == "table" and "{" .. decodeTable(v, depth + 1) .. "}" or tostring(v) .. "<" .. typeof(v) .. ">"
+                result = result .. " [" .. i .. "]=" .. vs
+            end
+        end)
+    end
+    
+    -- Способ 3: rawget
+    if result == "" then
+        pcall(function()
+            local mt = getmetatable(tbl)
+            if mt then
+                result = result .. " [metatable]=" .. tostring(mt)
+            end
+        end)
+    end
+    
+    if result == "" then
+        result = " <empty/protected>"
+    end
+    
+    return result
+end
+
+-- Слушаем ВСЕ _NETWORK эвенты с полной расшифровкой
+for _, obj in pairs(ReplicatedStorage._NETWORK:GetDescendants()) do
+    if obj:IsA("RemoteEvent") then
+        obj.OnClientEvent:Connect(function(...)
+            if not recording then return end
+            local args = {...}
+            log("UUID_EVENT", "=== " .. obj.Name .. " ===")
+            for i = 1, #args do
+                if type(args[i]) == "table" then
+                    log("UUID_EVENT", "Arg[" .. i .. "] TABLE: " .. decodeTable(args[i]))
+                else
+                    log("UUID_EVENT", "Arg[" .. i .. "]: " .. tostring(args[i]) .. "<" .. typeof(args[i]) .. ">")
+                end
+            end
+        end)
+    end
+end
+
+-- Слушаем leaderstats
+local function hookLeaderstats()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        for _, stat in pairs(ls:GetChildren()) do
+            if stat:IsA("IntValue") or stat:IsA("NumberValue") then
+                log("STAT", stat.Name .. " = " .. stat.Value)
+                stat.Changed:Connect(function(val)
+                    if recording then
+                        log("STAT", stat.Name .. " -> " .. val .. " (delta: " .. (val - stat.Value) .. ")")
+                    end
+                end)
+            end
+        end
+    end
+end
+hookLeaderstats()
+LocalPlayer.ChildAdded:Connect(function(c)
+    if c.Name == "leaderstats" then wait(0.1); hookLeaderstats() end
+end)
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "UUIDDecoder"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 580, 0, 400)
+MainFrame.Position = UDim2.new(0.5, -290, 0.5, -200)
+MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+MainFrame.BorderSizePixel = 1
+MainFrame.BorderColor3 = Color3.fromRGB(100, 100, 100)
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 28)
+TitleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+TitleBar.Parent = MainFrame
+
+local TitleText = Instance.new("TextLabel")
+TitleText.Size = UDim2.new(1, -60, 1, 0)
+TitleText.Position = UDim2.new(0, 10, 0, 0)
+TitleText.BackgroundTransparency = 1
+TitleText.Text = "UUID TABLE DECODER"
+TitleText.TextColor3 = Color3.fromRGB(255, 200, 80)
+TitleText.Font = Enum.Font.SourceSansBold
+TitleText.TextSize = 15
+TitleText.TextXAlignment = Enum.TextXAlignment.Left
+TitleText.Parent = TitleBar
+
+local TopPanel = Instance.new("Frame")
+TopPanel.Size = UDim2.new(1, 0, 0, 40)
+TopPanel.Position = UDim2.new(0, 0, 0, 28)
+TopPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+TopPanel.Parent = MainFrame
+
+local StartBtn = Instance.new("TextButton")
+StartBtn.Size = UDim2.new(0, 120, 0, 32)
+StartBtn.Position = UDim2.new(0, 10, 0, 4)
+StartBtn.BackgroundColor3 = Color3.fromRGB(40, 150, 40)
+StartBtn.Text = "СТАРТ ЗАПИСЬ"
+StartBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+StartBtn.Font = Enum.Font.SourceSansBold
+StartBtn.TextSize = 14
+StartBtn.Parent = TopPanel
+
+local CopyBtn = Instance.new("TextButton")
+CopyBtn.Size = UDim2.new(0, 100, 0, 32)
+CopyBtn.Position = UDim2.new(0, 140, 0, 4)
+CopyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 150)
+CopyBtn.Text = "КОПИРОВАТЬ"
+CopyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CopyBtn.Font = Enum.Font.SourceSansBold
+CopyBtn.TextSize = 12
+CopyBtn.Parent = TopPanel
+
+local StatusText = Instance.new("TextLabel")
+StatusText.Size = UDim2.new(0, 120, 0, 32)
+StatusText.Position = UDim2.new(1, -130, 0, 4)
+StatusText.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+StatusText.Text = "ГОТОВ"
+StatusText.TextColor3 = Color3.fromRGB(100, 255, 100)
+StatusText.Font = Enum.Font.SourceSansBold
+StatusText.TextSize = 13
+StatusText.Parent = TopPanel
+
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Size = UDim2.new(1, 0, 1, -70)
+ScrollFrame.Position = UDim2.new(0, 0, 0, 68)
+ScrollFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+ScrollFrame.BorderSizePixel = 0
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 5000)
+ScrollFrame.ScrollBarThickness = 10
+ScrollFrame.Parent = MainFrame
+
+local OutputLabel = Instance.new("TextLabel")
+OutputLabel.Size = UDim2.new(1, -10, 0, 5000)
+OutputLabel.Position = UDim2.new(0, 5, 0, 0)
+OutputLabel.BackgroundTransparency = 1
+OutputLabel.Text = "Нажми СТАРТ и ударь печаткой 1 раз"
+OutputLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+OutputLabel.Font = Enum.Font.SourceSans
+OutputLabel.TextSize = 13
+OutputLabel.TextXAlignment = Enum.TextXAlignment.Left
+OutputLabel.TextYAlignment = Enum.TextYAlignment.Top
+OutputLabel.TextWrapped = true
+OutputLabel.Parent = ScrollFrame
+
+-- Перетаскивание
+local dragging, dragStart, startPos = false, nil, nil
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = MainFrame.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+StartBtn.MouseButton1Click:Connect(function()
+    logLines = {}
+    recording = true
+    startTime = tick()
+    log("SYSTEM", "=== РАСШИФРОВКА UUID ТАБЛИЦ ===")
+    log("SYSTEM", "УДАРЬ ПЕЧАТКОЙ 1 РАЗ")
+    StatusText.Text = "ЗАПИСЬ!"
+    StatusText.TextColor3 = Color3.fromRGB(255, 100, 100)
+    
+    task.delay(2.5, function()
+        if recording then
+            recording = false
+            log("SYSTEM", "=== АВТОСТОП ===")
+            StatusText.Text = "ГОТОВО"
+            StatusText.TextColor3 = Color3.fromRGB(100, 255, 100)
+        end
+    end)
+end)
+
+CopyBtn.MouseButton1Click:Connect(function()
+    setclipboard(table.concat(logLines, "\n"))
+    log("SYSTEM", "Скопировано!")
+end)
