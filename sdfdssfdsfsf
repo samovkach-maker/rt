@@ -1,0 +1,109 @@
+-- ИССЛЕДОВАНИЕ ОБЪЕКТОВ BOUNTY
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+
+local results = "=== ИССЛЕДОВАНИЕ ОБЪЕКТОВ BOUNTY ===\n\n"
+
+-- Ищем все объекты Bounty в Workspace
+results = results .. "--- BOUNTY В WORKSPACE ---\n"
+for _, obj in pairs(Workspace:GetDescendants()) do
+    if obj.Name:lower():find("bounty") then
+        results = results .. obj.ClassName .. ": " .. obj:GetFullName() .. "\n"
+        
+        -- Если это Part с ClickDetector
+        if obj:IsA("Part") then
+            local cd = obj:FindFirstChildOfClass("ClickDetector")
+            if cd then
+                results = results .. "  ЕСТЬ CLICKDETECTOR!\n"
+                -- Пробуем активировать
+                pcall(function() fireclickdetector(cd) end)
+                results = results .. "  Активирован\n"
+            end
+            
+            -- ProximityPrompt
+            local pp = obj:FindFirstChildOfClass("ProximityPrompt")
+            if pp then
+                results = results .. "  ЕСТЬ PROXIMITYPROMPT!\n"
+                pcall(function() fireproximityprompt(pp) end)
+                results = results .. "  Активирован\n"
+            end
+        end
+    end
+end
+
+-- Ищем BountyHunterLever и BountyHunterMysteryRoom
+results = results .. "\n--- BOUNTY HUNTER ---\n"
+for _, obj in pairs(Workspace:GetDescendants()) do
+    if obj.Name:find("BountyHunter") then
+        results = results .. obj.ClassName .. ": " .. obj:GetFullName() .. "\n"
+        
+        -- Проверяем все кликабельные элементы
+        for _, child in pairs(obj:GetDescendants()) do
+            if child:IsA("ClickDetector") then
+                results = results .. "  ClickDetector в " .. child.Parent.Name .. "\n"
+                pcall(function() fireclickdetector(child) end)
+            end
+            if child:IsA("ProximityPrompt") then
+                results = results .. "  ProximityPrompt в " .. child.Parent.Name .. "\n"
+                pcall(function() fireproximityprompt(child) end)
+            end
+            if child:IsA("RemoteEvent") then
+                results = results .. "  RemoteEvent: " .. child.Name .. "\n"
+                pcall(function() child:FireServer() end)
+            end
+        end
+    end
+end
+
+-- Ищем в ReplicatedStorage.Assets.Bounty
+results = results .. "\n--- ASSETS.BOUNTY ---\n"
+local bountyFolder = ReplicatedStorage:FindFirstChild("Assets")
+if bountyFolder then
+    bountyFolder = bountyFolder:FindFirstChild("Bounty")
+    if bountyFolder then
+        for _, obj in pairs(bountyFolder:GetDescendants()) do
+            if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+                results = results .. obj.ClassName .. ": " .. obj.Name .. "\n"
+                pcall(function()
+                    if obj:IsA("RemoteEvent") then obj:FireServer() 
+                    else obj:InvokeServer() end
+                end)
+            end
+            if obj:IsA("Script") or obj:IsA("LocalScript") then
+                results = results .. "Скрипт: " .. obj.Name .. " (защищён)\n"
+            end
+        end
+    end
+end
+
+-- Пробуем найти Lever и дёрнуть его
+results = results .. "\n--- АКТИВАЦИЯ РЫЧАГОВ ---\n"
+for _, obj in pairs(Workspace:GetDescendants()) do
+    if obj.Name:find("Lever") or obj.Name:find("lever") then
+        if obj:IsA("Part") then
+            local cd = obj:FindFirstChildOfClass("ClickDetector")
+            if cd then
+                results = results .. "Рычаг: " .. obj:GetFullName() .. "\n"
+                for i = 1, 5 do
+                    pcall(function() fireclickdetector(cd) end)
+                    task.wait(0.1)
+                end
+                results = results .. "  Активирован 5 раз\n"
+            end
+        end
+    end
+end
+
+-- Проверяем слапы
+local slaps = 0
+local ls = LocalPlayer:FindFirstChild("leaderstats")
+if ls then
+    local s = ls:FindFirstChild("Slaps")
+    if s then slaps = s.Value end
+end
+results = results .. "\nСлапы: " .. slaps
+
+setclipboard(results)
+print(results)
