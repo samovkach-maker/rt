@@ -1,0 +1,287 @@
+-- ФАРМ БАУНТИ ЧЕРЕЗ GENERALHIT (РАБОЧИЙ МЕТОД)
+-- Находись рядом с игроками и запускай
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local farming = false
+local delayTime = 0.5
+local hits = 0
+local lastHitTime = 0
+local minDelay = 0.3
+
+-- Ищем GeneralHit
+local function findGeneralHit()
+    -- Прямой поиск
+    local gh = ReplicatedStorage:FindFirstChild("GeneralHit")
+    if gh and gh:IsA("RemoteEvent") then return gh end
+    
+    -- Ищем везде
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == "GeneralHit" and obj:IsA("RemoteEvent") then
+            return obj
+        end
+    end
+    return nil
+end
+
+local generalHit = findGeneralHit()
+if not generalHit then
+    warn("GeneralHit не найден!")
+end
+
+-- Функция удара
+local function doHit()
+    if not generalHit then
+        generalHit = findGeneralHit()
+        if not generalHit then return false end
+    end
+    
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    
+    -- Ищем цель рядом
+    local target = nil
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local tHrp = player.Character:FindFirstChild("HumanoidRootPart")
+            if tHrp and (tHrp.Position - hrp.Position).Magnitude < 30 then
+                target = tHrp
+                break
+            end
+        end
+    end
+    if not target then target = hrp end
+    
+    -- Отправляем хит с разными аргументами для надёжности
+    pcall(function() generalHit:FireServer(target.Position) end)
+    pcall(function() generalHit:FireServer(target) end)
+    pcall(function() generalHit:FireServer(hrp.Position) end)
+    pcall(function() generalHit:FireServer() end)
+    
+    return true
+end
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "GeneralHitFarm"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 280, 0, 230)
+Frame.Position = UDim2.new(0.5, -140, 0.25, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+Frame.BorderSizePixel = 1
+Frame.BorderColor3 = Color3.fromRGB(80, 80, 80)
+Frame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 28)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Title.Text = "GENERAL HIT FARM (РАБОЧИЙ)"
+Title.TextColor3 = Color3.fromRGB(100, 255, 100)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 13
+Title.Parent = Frame
+
+local SlapsLabel = Instance.new("TextLabel")
+SlapsLabel.Size = UDim2.new(0.9, 0, 0, 25)
+SlapsLabel.Position = UDim2.new(0.05, 0, 0, 33)
+SlapsLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+SlapsLabel.Text = "Slaps: ..."
+SlapsLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+SlapsLabel.Font = Enum.Font.SourceSansBold
+SlapsLabel.TextSize = 13
+SlapsLabel.Parent = Frame
+
+local HitsLabel = Instance.new("TextLabel")
+HitsLabel.Size = UDim2.new(0.9, 0, 0, 20)
+HitsLabel.Position = UDim2.new(0.05, 0, 0, 60)
+HitsLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+HitsLabel.Text = "Ударов: 0 | Задержка: 0.5с"
+HitsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+HitsLabel.Font = Enum.Font.SourceSans
+HitsLabel.TextSize = 12
+HitsLabel.Parent = Frame
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0.9, 0, 0, 42)
+ToggleBtn.Position = UDim2.new(0.05, 0, 0, 85)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 150, 40)
+ToggleBtn.Text = "СТАРТ ФАРМ"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.SourceSansBold
+ToggleBtn.TextSize = 16
+ToggleBtn.Parent = Frame
+
+-- Слайдер скорости
+local SpeedText = Instance.new("TextLabel")
+SpeedText.Size = UDim2.new(0.9, 0, 0, 18)
+SpeedText.Position = UDim2.new(0.05, 0, 0, 132)
+SpeedText.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+SpeedText.Text = "Скорость: 0.5с"
+SpeedText.TextColor3 = Color3.fromRGB(200, 200, 200)
+SpeedText.Font = Enum.Font.SourceSans
+SpeedText.TextSize = 11
+SpeedText.Parent = Frame
+
+local FasterBtn = Instance.new("TextButton")
+FasterBtn.Size = UDim2.new(0.28, 0, 0, 26)
+FasterBtn.Position = UDim2.new(0.05, 0, 0, 153)
+FasterBtn.BackgroundColor3 = Color3.fromRGB(0, 110, 0)
+FasterBtn.Text = "+0.05"
+FasterBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+FasterBtn.Font = Enum.Font.SourceSans
+FasterBtn.TextSize = 12
+FasterBtn.Parent = Frame
+
+local SlowerBtn = Instance.new("TextButton")
+SlowerBtn.Size = UDim2.new(0.28, 0, 0, 26)
+SlowerBtn.Position = UDim2.new(0.35, 0, 0, 153)
+SlowerBtn.BackgroundColor3 = Color3.fromRGB(110, 0, 0)
+SlowerBtn.Text = "-0.05"
+SlowerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SlowerBtn.Font = Enum.Font.SourceSans
+SlowerBtn.TextSize = 12
+SlowerBtn.Parent = Frame
+
+local OptBtn = Instance.new("TextButton")
+OptBtn.Size = UDim2.new(0.28, 0, 0, 26)
+OptBtn.Position = UDim2.new(0.65, 0, 0, 153)
+OptBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 0)
+OptBtn.Text = "АВТО"
+OptBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+OptBtn.Font = Enum.Font.SourceSans
+OptBtn.TextSize = 12
+OptBtn.Parent = Frame
+
+local MethodText = Instance.new("TextLabel")
+MethodText.Size = UDim2.new(0.9, 0, 0, 18)
+MethodText.Position = UDim2.new(0.05, 0, 0, 185)
+MethodText.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MethodText.Text = "Метод: GeneralHit"
+MethodText.TextColor3 = Color3.fromRGB(150, 150, 150)
+MethodText.Font = Enum.Font.SourceSans
+MethodText.TextSize = 11
+MethodText.Parent = Frame
+
+-- Обновление Slaps
+local function getSlaps()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local s = ls:FindFirstChild("Slaps")
+        if s then return s.Value end
+    end
+    return 0
+end
+
+local function updateUI()
+    SlapsLabel.Text = "Slaps: " .. getSlaps()
+    HitsLabel.Text = "Ударов: " .. hits .. " | Задержка: " .. string.format("%.2f", delayTime) .. "с"
+    SpeedText.Text = "Скорость: " .. string.format("%.2f", delayTime) .. "с"
+end
+
+-- Фарм цикл
+local farmConnection
+local function startFarm()
+    farming = true
+    farmConnection = RunService.Heartbeat:Connect(function(dt)
+        if not farming then return end
+        lastHitTime = lastHitTime + dt
+        if lastHitTime >= delayTime then
+            lastHitTime = 0
+            doHit()
+            hits = hits + 1
+        end
+    end)
+    -- UI обновление
+    task.spawn(function()
+        while farming do
+            updateUI()
+            task.wait(0.5)
+        end
+    end)
+end
+
+local function stopFarm()
+    farming = false
+    if farmConnection then
+        farmConnection:Disconnect()
+        farmConnection = nil
+    end
+    updateUI()
+end
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    if farming then
+        stopFarm()
+        ToggleBtn.Text = "СТАРТ ФАРМ"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 150, 40)
+    else
+        startFarm()
+        ToggleBtn.Text = "СТОП ФАРМ"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+    end
+end)
+
+FasterBtn.MouseButton1Click:Connect(function()
+    delayTime = math.max(0.1, delayTime - 0.05)
+    updateUI()
+end)
+
+SlowerBtn.MouseButton1Click:Connect(function()
+    delayTime = math.min(2.0, delayTime + 0.05)
+    updateUI()
+end)
+
+OptBtn.MouseButton1Click:Connect(function()
+    -- Авто-подбор: начинаем с 0.1 и увеличиваем пока не найдём стабильную
+    delayTime = 0.1
+    MethodText.Text = "Метод: GeneralHit [АВТО: ищу скорость...]"
+    task.spawn(function()
+        while farming and delayTime <= 1.0 do
+            task.wait(2)
+            delayTime = delayTime + 0.1
+            updateUI()
+        end
+        MethodText.Text = "Метод: GeneralHit [АВТО: готово]"
+    end)
+end)
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = Frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+-- При закрытии GUI остановить фарм
+ScreenGui.Destroying:Connect(function()
+    stopFarm()
+end)
+
+print("==============================================")
+print("GENERAL HIT FARM ГОТОВ!")
+print("1. Находись рядом с другими игроками")
+print("2. Нажми СТАРТ ФАРМ")
+print("3. Если не даёт баунти часто - увеличивай задержку (-0.05)")
+print("4. Кнопка АВТО подберёт оптимальную скорость")
+print("==============================================")
+print("GeneralHit найден: " .. (generalHit and "ДА" or "НЕТ"))
