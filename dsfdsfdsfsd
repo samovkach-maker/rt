@@ -1,0 +1,304 @@
+-- БЕЗОПАСНЫЙ ТЕСТ ЭВЕНТОВ: Медленно, с паузами, не кикает
+-- Тестирует по 5 эвентов, пауза 3 сек, продолжает после перезапуска
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local function getSlaps()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local s = ls:FindFirstChild("Slaps")
+        if s then return s.Value end
+    end
+    return 0
+end
+
+local function findRemote(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteEvent") then
+            return obj
+        end
+    end
+    return nil
+end
+
+-- Собираем все RemoteEvent, исключаем системные
+local function collectRemotes()
+    local remotes = {}
+    local exclude = {"cmdr", "opera", "badge", "friend", "sidebar", "tournament", "bought", 
+                     "gift", "trade", "setting", "daily", "twitter", "crate", "emote", "footstep",
+                     "chat", "business", "splat", "music", "radio", "prompt", "vote", "tunnel",
+                     "display", "log", "countdown", "check", "popup", "platform", "party",
+                     "system", "product", "boost", "spectator", "cube", "shopkeeper", "roguelike",
+                     "card", "game", "win", "glove", "elude", "vip", "save", "claim", "reward"}
+    
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            local name = obj.Name:lower()
+            local skip = false
+            for _, ex in ipairs(exclude) do
+                if name:find(ex) then skip = true; break end
+            end
+            if not skip then
+                table.insert(remotes, obj)
+            end
+        end
+    end
+    return remotes
+end
+
+local allRemotes = collectRemotes()
+local startIndex = 1
+local workingList = {}
+local testing = false
+local stopped = false
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SafeTesterGUI"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 330, 0, 400)
+Frame.Position = UDim2.new(0.5, -165, 0.5, -200)
+Frame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+Frame.BorderSizePixel = 1
+Frame.BorderColor3 = Color3.fromRGB(100, 100, 100)
+Frame.ClipsDescendants = true
+Frame.Active = true
+Frame.Parent = ScreenGui
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 28)
+TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TitleBar.Parent = Frame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -10, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "БЕЗОПАСНЫЙ ТЕСТ ЭВЕНТОВ"
+Title.TextColor3 = Color3.fromRGB(100, 255, 100)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 13
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TitleBar
+
+local InfoLabel = Instance.new("TextLabel")
+InfoLabel.Size = UDim2.new(0.9, 0, 0, 35)
+InfoLabel.Position = UDim2.new(0.05, 0, 0, 33)
+InfoLabel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+InfoLabel.Text = "Готов. " .. #allRemotes .. " эвентов для теста.\nПауза 3 сек между группами."
+InfoLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+InfoLabel.Font = Enum.Font.SourceSans
+InfoLabel.TextSize = 11
+InfoLabel.Parent = Frame
+
+local StartInput = Instance.new("TextBox")
+StartInput.Size = UDim2.new(0.3, 0, 0, 25)
+StartInput.Position = UDim2.new(0.05, 0, 0, 73)
+StartInput.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+StartInput.Text = "1"
+StartInput.PlaceholderText = "Старт с №"
+StartInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+StartInput.Font = Enum.Font.SourceSans
+StartInput.TextSize = 13
+StartInput.Parent = Frame
+
+local StartLabel = Instance.new("TextLabel")
+StartLabel.Size = UDim2.new(0.55, 0, 0, 25)
+StartLabel.Position = UDim2.new(0.38, 0, 0, 73)
+StartLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+StartLabel.Text = "Стартовый индекс"
+StartLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+StartLabel.Font = Enum.Font.SourceSans
+StartLabel.TextSize = 12
+StartLabel.Parent = Frame
+
+local BtnStart = Instance.new("TextButton")
+BtnStart.Size = UDim2.new(0.9, 0, 0, 38)
+BtnStart.Position = UDim2.new(0.05, 0, 0, 103)
+BtnStart.BackgroundColor3 = Color3.fromRGB(30, 140, 30)
+BtnStart.Text = "СТАРТ ТЕСТ (медленно)"
+BtnStart.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnStart.Font = Enum.Font.SourceSansBold
+BtnStart.TextSize = 14
+BtnStart.Parent = Frame
+
+local BtnStop = Instance.new("TextButton")
+BtnStop.Size = UDim2.new(0.9, 0, 0, 30)
+BtnStop.Position = UDim2.new(0.05, 0, 0, 145)
+BtnStop.BackgroundColor3 = Color3.fromRGB(130, 30, 30)
+BtnStop.Text = "СТОП"
+BtnStop.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnStop.Font = Enum.Font.SourceSansBold
+BtnStop.TextSize = 13
+BtnStop.Parent = Frame
+
+local BtnCopy = Instance.new("TextButton")
+BtnCopy.Size = UDim2.new(0.9, 0, 0, 28)
+BtnCopy.Position = UDim2.new(0.05, 0, 0, 178)
+BtnCopy.BackgroundColor3 = Color3.fromRGB(40, 40, 130)
+BtnCopy.Text = "КОПИРОВАТЬ РАБОЧИЕ"
+BtnCopy.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnCopy.Font = Enum.Font.SourceSansBold
+BtnCopy.TextSize = 12
+BtnCopy.Parent = Frame
+
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Size = UDim2.new(0.9, 0, 0, 175)
+ScrollFrame.Position = UDim2.new(0.05, 0, 0, 210)
+ScrollFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+ScrollFrame.BorderSizePixel = 0
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 5000)
+ScrollFrame.ScrollBarThickness = 6
+ScrollFrame.Parent = Frame
+
+local OutputLabel = Instance.new("TextLabel")
+OutputLabel.Size = UDim2.new(1, -5, 0, 5000)
+OutputLabel.Position = UDim2.new(0, 3, 0, 0)
+OutputLabel.BackgroundTransparency = 1
+OutputLabel.Text = "Нажми СТАРТ"
+OutputLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+OutputLabel.Font = Enum.Font.SourceSans
+OutputLabel.TextSize = 12
+OutputLabel.TextXAlignment = Enum.TextXAlignment.Left
+OutputLabel.TextYAlignment = Enum.TextYAlignment.Top
+OutputLabel.TextWrapped = true
+OutputLabel.Parent = ScrollFrame
+
+local outputLines = {}
+local function addOutput(msg)
+    table.insert(outputLines, msg)
+    if #outputLines > 150 then table.remove(outputLines, 1) end
+    OutputLabel.Text = table.concat(outputLines, "\n")
+end
+
+-- Тест
+local function testSingleRemote(remote)
+    local char = LocalPlayer.Character
+    if not char then return 0 end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return 0 end
+    
+    local before = getSlaps()
+    
+    -- Всего 3 вызова с разными аргументами
+    pcall(function() remote:FireServer(hrp) end)
+    task.wait(0.1)
+    pcall(function() remote:FireServer(hrp.Position) end)
+    task.wait(0.1)
+    pcall(function() remote:FireServer() end)
+    
+    task.wait(0.5)
+    local after = getSlaps()
+    return after - before
+end
+
+local function startTest()
+    startIndex = tonumber(StartInput.Text) or 1
+    if startIndex < 1 then startIndex = 1 end
+    if startIndex > #allRemotes then startIndex = #allRemotes end
+    
+    outputLines = {}
+    workingList = {}
+    testing = true
+    stopped = false
+    
+    addOutput("=== НАЧАЛО ТЕСТА С ИНДЕКСА " .. startIndex .. " ===")
+    addOutput("Всего: " .. #allRemotes .. " | Пауза 3 сек между группами\n")
+    
+    task.spawn(function()
+        local batchSize = 5
+        local currentBatch = 0
+        
+        for i = startIndex, #allRemotes do
+            if not testing or stopped then break end
+            
+            local remote = allRemotes[i]
+            local name = remote:GetFullName()
+            
+            addOutput("[" .. i .. "/" .. #allRemotes .. "] Тест: " .. remote.Name)
+            local gained = testSingleRemote(remote)
+            
+            if gained > 0 then
+                addOutput("  ✅ РАБОТАЕТ! +" .. gained .. " Slaps")
+                table.insert(workingList, {index = i, name = name, gained = gained})
+            end
+            
+            currentBatch = currentBatch + 1
+            
+            -- Пауза каждые batchSize эвентов
+            if currentBatch >= batchSize then
+                currentBatch = 0
+                addOutput("  ⏳ Пауза 3 сек... (прогресс: " .. i .. "/" .. #allRemotes .. ")")
+                for t = 3, 1, -1 do
+                    if not testing or stopped then break end
+                    task.wait(1)
+                end
+            else
+                task.wait(0.3)
+            end
+        end
+        
+        testing = false
+        addOutput("\n=== ЗАВЕРШЕНО ===")
+        addOutput("Протестировано: " .. (stopped and "прервано" or "все"))
+        addOutput("Найдено рабочих: " .. #workingList)
+        
+        for i, w in ipairs(workingList) do
+            addOutput("  " .. i .. ". " .. w.name .. " (+" .. w.gained .. ")")
+        end
+        
+        InfoLabel.Text = "Завершено. Найдено: " .. #workingList
+    end)
+end
+
+BtnStart.MouseButton1Click:Connect(function()
+    if not testing then
+        startTest()
+    end
+end)
+
+BtnStop.MouseButton1Click:Connect(function()
+    stopped = true
+    testing = false
+    addOutput("\n⏹ ОСТАНОВЛЕНО на индексе ~" .. (startIndex + #outputLines))
+    InfoLabel.Text = "Остановлено. Запомни индекс для продолжения."
+end)
+
+BtnCopy.MouseButton1Click:Connect(function()
+    local text = "=== РАБОЧИЕ ЭВЕНТЫ ===\n"
+    for i, w in ipairs(workingList) do
+        text = text .. w.name .. "\n"
+    end
+    text = text .. "\n=== ВСЕ ЛОГИ ===\n" .. table.concat(outputLines, "\n")
+    setclipboard(text)
+    addOutput("📋 Скопировано!")
+end)
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = Frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+print("БЕЗОПАСНЫЙ ТЕСТ ГОТОВ")
+print("Всего эвентов: " .. #allRemotes)
+print("Тест займёт ~" .. math.ceil(#allRemotes * 0.8 / 60) .. " минут")
+print("Если кикнет — запиши индекс и продолжь с него")
