@@ -1,0 +1,170 @@
+-- ФАРМ БАУНТИ НА СЕБЕ (никого не трогает)
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+
+local function find(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteEvent") then return obj end
+    end
+    return nil
+end
+
+local ga = find("GeneralAbility")
+local gh = find("GeneralHit")
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "SelfFarmGUI"
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 280, 0, 220)
+frame.Position = UDim2.new(0.5, -140, 0.5, -110)
+frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+frame.BorderSizePixel = 1
+frame.BorderColor3 = Color3.fromRGB(100, 100, 100)
+frame.Parent = gui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 26)
+title.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+title.Text = "ФАРМ БАУНТИ НА СЕБЕ"
+title.TextColor3 = Color3.fromRGB(100, 255, 100)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 13
+title.Parent = frame
+
+local status = Instance.new("TextLabel")
+status.Size = UDim2.new(0.9, 0, 0, 40)
+status.Position = UDim2.new(0.05, 0, 0, 33)
+status.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+status.Text = "Готов\nБьёт только тебя"
+status.TextColor3 = Color3.fromRGB(200, 200, 200)
+status.Font = Enum.Font.SourceSans
+status.TextSize = 12
+status.Parent = frame
+
+local counter = Instance.new("TextLabel")
+counter.Size = UDim2.new(0.9, 0, 0, 20)
+counter.Position = UDim2.new(0.05, 0, 0, 78)
+counter.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+counter.Text = "Ударов: 0"
+counter.TextColor3 = Color3.fromRGB(255, 255, 100)
+counter.Font = Enum.Font.SourceSansBold
+counter.TextSize = 14
+counter.Parent = frame
+
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Size = UDim2.new(0.9, 0, 0, 18)
+speedLabel.Position = UDim2.new(0.05, 0, 0, 100)
+speedLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+speedLabel.Text = "Задержка: 0.5с"
+speedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+speedLabel.Font = Enum.Font.SourceSans
+speedLabel.TextSize = 11
+speedLabel.Parent = frame
+
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0.42, 0, 0, 35)
+btn.Position = UDim2.new(0.05, 0, 0, 123)
+btn.BackgroundColor3 = Color3.fromRGB(30, 140, 30)
+btn.Text = "СТАРТ"
+btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+btn.Font = Enum.Font.SourceSansBold
+btn.TextSize = 14
+btn.Parent = frame
+
+local fasterBtn = Instance.new("TextButton")
+fasterBtn.Size = UDim2.new(0.42, 0, 0, 35)
+fasterBtn.Position = UDim2.new(0.52, 0, 0, 123)
+fasterBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+fasterBtn.Text = "БЫСТРЕЕ"
+fasterBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+fasterBtn.Font = Enum.Font.SourceSansBold
+fasterBtn.TextSize = 12
+fasterBtn.Parent = frame
+
+local info = Instance.new("TextLabel")
+info.Size = UDim2.new(0.9, 0, 0, 30)
+info.Position = UDim2.new(0.05, 0, 0, 165)
+info.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+info.Text = "Ability +5 | Hit +1 за удар"
+info.TextColor3 = Color3.fromRGB(150, 150, 150)
+info.Font = Enum.Font.SourceSans
+info.TextSize = 11
+info.Parent = frame
+
+local farming = false
+local hits = 0
+local delayTime = 0.5
+
+local function doHit()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    -- Бьём ТОЛЬКО СЕБЯ
+    if ga then
+        pcall(function() ga:FireServer(hrp) end)
+    end
+    task.wait(0.03)
+    if gh then
+        pcall(function() gh:FireServer(hrp) end)
+    end
+end
+
+btn.MouseButton1Click:Connect(function()
+    if farming then
+        farming = false
+        btn.Text = "СТАРТ"
+        btn.BackgroundColor3 = Color3.fromRGB(30, 140, 30)
+        status.Text = "Остановлено"
+        return
+    end
+    
+    farming = true
+    hits = 0
+    btn.Text = "СТОП"
+    btn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+    status.Text = "ФАРМ НА СЕБЕ"
+    status.TextColor3 = Color3.fromRGB(100, 255, 100)
+    
+    task.spawn(function()
+        while farming do
+            doHit()
+            hits = hits + 1
+            counter.Text = "Ударов: " .. hits
+            task.wait(delayTime)
+        end
+    end)
+end)
+
+fasterBtn.MouseButton1Click:Connect(function()
+    delayTime = math.max(0.2, delayTime - 0.1)
+    speedLabel.Text = "Задержка: " .. string.format("%.1f", delayTime) .. "с"
+end)
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+print("ФАРМ НА СЕБЕ ГОТОВ")
+print("Бьёт только тебя, никто не телепортируется")
+print("Нажми СТАРТ")
