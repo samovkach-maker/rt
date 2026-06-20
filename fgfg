@@ -1,0 +1,352 @@
+-- СУПЕР-ДИАГНОСТИКА С GUI ВЫВОДОМ: Всё в одном окне с прокруткой
+-- Запусти, нажми СТАРТ, ударь печаткой 1 раз, жди автостоп, читай в окне
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local logLines = {}
+local MAX_LINES = 200
+local recording = false
+local startTime = 0
+
+-- Функция логирования в GUI
+local function log(cat, msg)
+    local t = string.format("%.3f", tick() - startTime)
+    local line = "[" .. t .. "][" .. cat .. "] " .. tostring(msg)
+    table.insert(logLines, line)
+    if #logLines > MAX_LINES then
+        table.remove(logLines, 1)
+    end
+    -- Обновляем текст в GUI
+    pcall(function()
+        local text = table.concat(logLines, "\n")
+        if OutputLabel then
+            OutputLabel.Text = text
+            -- Автопрокрутка вниз
+            OutputLabel.Position = UDim2.new(0, 0, 0, -OutputLabel.TextBounds.Y + OutputLabel.AbsoluteSize.Y)
+        end
+    end)
+end
+
+-- Функция безопасного преобразования аргументов
+local function safeArg(arg)
+    if arg == nil then return "nil"
+    elseif type(arg) == "string" then return '"' .. string.sub(arg, 1, 50) .. '"'
+    elseif type(arg) == "number" then return string.format("%.4f", arg)
+    elseif type(arg) == "boolean" then return arg and "true" or "false"
+    elseif typeof(arg) == "Vector3" then return string.format("V3(%.1f,%.1f,%.1f)", arg.X, arg.Y, arg.Z)
+    elseif typeof(arg) == "CFrame" then return string.format("CF(%.1f,%.1f,%.1f)", arg.Position.X, arg.Position.Y, arg.Position.Z)
+    elseif typeof(arg) == "Instance" then return arg.ClassName .. ":" .. arg.Name
+    elseif type(arg) == "table" then
+        local c = 0
+        pcall(function() for _ in pairs(arg) do c = c + 1; if c >= 10 then break end end end)
+        return "Table(" .. c .. ")"
+    elseif type(arg) == "function" then return "func"
+    else return tostring(arg):sub(1, 50)
+    end
+end
+
+-- GUI Создание
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SuperDiagGUI"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+-- Главная рамка
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 600, 0, 450)
+MainFrame.Position = UDim2.new(0.5, -300, 0.5, -225)
+MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+MainFrame.BorderSizePixel = 1
+MainFrame.BorderColor3 = Color3.fromRGB(100, 100, 100)
+MainFrame.Parent = ScreenGui
+MainFrame.Active = true
+MainFrame.ClipsDescendants = true
+
+-- Заголовок
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 30)
+TitleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+TitleBar.Parent = MainFrame
+
+local TitleText = Instance.new("TextLabel")
+TitleText.Size = UDim2.new(1, -80, 1, 0)
+TitleText.Position = UDim2.new(0, 10, 0, 0)
+TitleText.BackgroundTransparency = 1
+TitleText.Text = "СУПЕР-ДИАГНОСТИКА"
+TitleText.TextColor3 = Color3.fromRGB(255, 180, 50)
+TitleText.Font = Enum.Font.SourceSansBold
+TitleText.TextSize = 16
+TitleText.TextXAlignment = Enum.TextXAlignment.Left
+TitleText.Parent = TitleBar
+
+-- Кнопка закрытия
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 60, 0, 24)
+CloseBtn.Position = UDim2.new(1, -65, 0, 3)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+CloseBtn.Text = "ЗАКРЫТЬ"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.SourceSansBold
+CloseBtn.TextSize = 11
+CloseBtn.Parent = TitleBar
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- Верхняя панель с кнопками
+local TopPanel = Instance.new("Frame")
+TopPanel.Size = UDim2.new(1, 0, 0, 45)
+TopPanel.Position = UDim2.new(0, 0, 0, 30)
+TopPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+TopPanel.Parent = MainFrame
+
+local StartBtn = Instance.new("TextButton")
+StartBtn.Size = UDim2.new(0, 140, 0, 35)
+StartBtn.Position = UDim2.new(0, 10, 0, 5)
+StartBtn.BackgroundColor3 = Color3.fromRGB(40, 150, 40)
+StartBtn.Text = "СТАРТ ЗАПИСЬ"
+StartBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+StartBtn.Font = Enum.Font.SourceSansBold
+StartBtn.TextSize = 14
+StartBtn.Parent = TopPanel
+
+local StopBtn = Instance.new("TextButton")
+StopBtn.Size = UDim2.new(0, 100, 0, 35)
+StopBtn.Position = UDim2.new(0, 160, 0, 5)
+StopBtn.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+StopBtn.Text = "СТОП"
+StopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+StopBtn.Font = Enum.Font.SourceSansBold
+StopBtn.TextSize = 14
+StopBtn.Parent = TopPanel
+
+local CopyBtn = Instance.new("TextButton")
+CopyBtn.Size = UDim2.new(0, 100, 0, 35)
+CopyBtn.Position = UDim2.new(0, 270, 0, 5)
+CopyBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 160)
+CopyBtn.Text = "КОПИРОВАТЬ"
+CopyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CopyBtn.Font = Enum.Font.SourceSansBold
+CopyBtn.TextSize = 11
+CopyBtn.Parent = TopPanel
+
+local ClearBtn = Instance.new("TextButton")
+ClearBtn.Size = UDim2.new(0, 80, 0, 35)
+ClearBtn.Position = UDim2.new(0, 380, 0, 5)
+ClearBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+ClearBtn.Text = "ОЧИСТИТЬ"
+ClearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ClearBtn.Font = Enum.Font.SourceSansBold
+ClearBtn.TextSize = 11
+ClearBtn.Parent = TopPanel
+
+local StatusText = Instance.new("TextLabel")
+StatusText.Size = UDim2.new(0, 130, 0, 35)
+StatusText.Position = UDim2.new(1, -140, 0, 5)
+StatusText.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+StatusText.Text = "ГОТОВ"
+StatusText.TextColor3 = Color3.fromRGB(100, 255, 100)
+StatusText.Font = Enum.Font.SourceSansBold
+StatusText.TextSize = 13
+StatusText.Parent = TopPanel
+
+-- Область вывода с прокруткой
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Size = UDim2.new(1, 0, 1, -80)
+ScrollFrame.Position = UDim2.new(0, 0, 0, 75)
+ScrollFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+ScrollFrame.BorderSizePixel = 0
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 10000)
+ScrollFrame.ScrollBarThickness = 12
+ScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
+ScrollFrame.Parent = MainFrame
+
+local OutputLabel = Instance.new("TextLabel")
+OutputLabel.Size = UDim2.new(1, -10, 0, 10000)
+OutputLabel.Position = UDim2.new(0, 5, 0, 0)
+OutputLabel.BackgroundTransparency = 1
+OutputLabel.Text = "Ожидание запуска диагностики...\nНажми СТАРТ и ударь печаткой 1 раз"
+OutputLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+OutputLabel.Font = Enum.Font.SourceSans
+OutputLabel.TextSize = 13
+OutputLabel.TextXAlignment = Enum.TextXAlignment.Left
+OutputLabel.TextYAlignment = Enum.TextYAlignment.Top
+OutputLabel.TextWrapped = true
+OutputLabel.RichText = true
+OutputLabel.Parent = ScrollFrame
+
+-- Перетаскивание окна
+local dragging = false
+local dragStart = nil
+local startPos = nil
+
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+-- Настройка перехватов
+local function setupHooks()
+    -- FireServer
+    local mt = getrawmetatable(game)
+    local oldNamecall = mt.__namecall
+    setreadonly(mt, false)
+    mt.__namecall = function(self, ...)
+        local method = getnamecallmethod()
+        local args = {...}
+        
+        if (method == "FireServer" or method == "InvokeServer") and recording then
+            local remotePath = "?"
+            pcall(function() remotePath = self:GetFullName() end)
+            local argStr = ""
+            for i = 1, math.min(#args, 8) do
+                argStr = argStr .. "[" .. i .. "]=" .. safeArg(args[i]) .. " "
+            end
+            if #args > 8 then argStr = argStr .. "(+" .. (#args - 8) .. " args)" end
+            log(method, remotePath .. " " .. argStr)
+        end
+        
+        return oldNamecall(self, ...)
+    end
+    setreadonly(mt, true)
+    
+    -- OnClientEvent
+    task.spawn(function()
+        for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+            if obj:IsA("RemoteEvent") then
+                obj.OnClientEvent:Connect(function(...)
+                    if not recording then return end
+                    local args = {...}
+                    if #args > 0 then
+                        local argStr = ""
+                        for i = 1, math.min(#args, 5) do
+                            argStr = argStr .. "[" .. i .. "]=" .. safeArg(args[i]) .. " "
+                        end
+                        log("OnClientEvent", obj.Name .. " " .. argStr)
+                    end
+                end)
+            end
+        end
+    end)
+    
+    -- Character/Tool
+    local function hookTool()
+        if LocalPlayer.Character then
+            for _, obj in pairs(LocalPlayer.Character:GetDescendants()) do
+                if obj:IsA("Tool") then
+                    log("SYSTEM", "Найден инструмент: " .. obj.Name)
+                    obj.Activated:Connect(function()
+                        if recording then
+                            log("TOOL", obj.Name .. " АКТИВИРОВАН")
+                        end
+                    end)
+                end
+            end
+        end
+    end
+    
+    LocalPlayer.CharacterAdded:Connect(function()
+        wait(0.3)
+        hookTool()
+    end)
+    hookTool()
+    
+    -- Leaderstats
+    local function hookLeaderstats()
+        local ls = LocalPlayer:FindFirstChild("leaderstats")
+        if ls then
+            for _, stat in pairs(ls:GetChildren()) do
+                if stat:IsA("IntValue") or stat:IsA("NumberValue") or stat:IsA("StringValue") then
+                    log("LEADERSTAT", stat.Name .. " = " .. tostring(stat.Value))
+                    stat.Changed:Connect(function(val)
+                        if recording then
+                            log("STAT.Change", stat.Name .. " -> " .. tostring(val))
+                        end
+                    end)
+                end
+            end
+        end
+    end
+    hookLeaderstats()
+    LocalPlayer.ChildAdded:Connect(function(c)
+        if c.Name == "leaderstats" then wait(0.1); hookLeaderstats() end
+    end)
+    
+    log("SYSTEM", "Все перехваты установлены")
+end
+
+-- Кнопки
+StartBtn.MouseButton1Click:Connect(function()
+    logLines = {}
+    recording = true
+    startTime = tick()
+    log("SYSTEM", "========== ДИАГНОСТИКА ЗАПУЩЕНА ==========")
+    log("SYSTEM", "УДАРЬ ПЕЧАТКОЙ 1 РАЗ ПРЯМО СЕЙЧАС")
+    log("SYSTEM", "Локальный игрок: " .. LocalPlayer.Name)
+    if LocalPlayer.Character then
+        log("SYSTEM", "Позиция: " .. tostring(LocalPlayer.Character:GetPivot().Position))
+    end
+    StatusText.Text = "ЗАПИСЬ!"
+    StatusText.TextColor3 = Color3.fromRGB(255, 100, 100)
+    StartBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+    
+    -- Автостоп через 3 секунды
+    task.delay(3, function()
+        if recording then
+            recording = false
+            log("SYSTEM", "========== АВТОСТОП (3 сек) ==========")
+            StatusText.Text = "ГОТОВО"
+            StatusText.TextColor3 = Color3.fromRGB(100, 255, 100)
+            StartBtn.BackgroundColor3 = Color3.fromRGB(40, 150, 40)
+        end
+    end)
+end)
+
+StopBtn.MouseButton1Click:Connect(function()
+    if recording then
+        recording = false
+        log("SYSTEM", "========== ОСТАНОВЛЕНО ВРУЧНУЮ ==========")
+        StatusText.Text = "СТОП"
+        StatusText.TextColor3 = Color3.fromRGB(255, 200, 100)
+        StartBtn.BackgroundColor3 = Color3.fromRGB(40, 150, 40)
+    end
+end)
+
+CopyBtn.MouseButton1Click:Connect(function()
+    local text = table.concat(logLines, "\n")
+    setclipboard(text)
+    log("SYSTEM", "Данные скопированы в буфер обмена (" .. #logLines .. " строк)")
+end)
+
+ClearBtn.MouseButton1Click:Connect(function()
+    logLines = {}
+    OutputLabel.Text = "Очищено. Нажми СТАРТ для новой записи."
+end)
+
+-- Запуск
+setupHooks()
+log("SYSTEM", "ДИАГНОСТИКА ГОТОВА К РАБОТЕ")
+log("SYSTEM", "1. Нажми СТАРТ ЗАПИСЬ")
+log("SYSTEM", "2. Ударь печаткой 1 раз")
+log("SYSTEM", "3. Смотри логи в этом окне")
+log("SYSTEM", "4. Нажми КОПИРОВАТЬ чтобы сохранить")
