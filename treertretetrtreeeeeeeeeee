@@ -1,0 +1,81 @@
+-- ТЕСТ МЕТОДОВ УБИЙСТВА (проверяем какой реально работает)
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local function getSlaps()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local s = ls:FindFirstChild("Slaps")
+        if s then return s.Value end
+    end
+    return 0
+end
+
+-- Находим цель
+local target = nil
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer and p.Character then
+        target = p
+        break
+    end
+end
+
+if not target then
+    print("Нет цели!")
+    return
+end
+
+print("Цель: " .. target.Name)
+print("Слапы до: " .. getSlaps())
+
+local char = target.Character
+local hum = char:FindFirstChildOfClass("Humanoid")
+if not hum then
+    -- Ищем по-другому
+    for _, obj in pairs(char:GetDescendants()) do
+        if obj:IsA("Humanoid") then
+            hum = obj
+            break
+        end
+    end
+end
+
+if hum then
+    print("Humanoid найден: " .. hum.ClassName)
+    print("Здоровье: " .. hum.Health .. "/" .. hum.MaxHealth)
+    
+    -- Метод 1: Health = 0
+    local before = getSlaps()
+    hum.Health = 0
+    print("Метод 1 (Health=0): здоровье стало " .. hum.Health)
+    task.wait(1)
+    print("Слапы после метода 1: " .. getSlaps() .. " (+" .. (getSlaps() - before) .. ")")
+    
+    -- Метод 2: BreakJoints
+    if target.Character then
+        before = getSlaps()
+        target.Character:BreakJoints()
+        print("Метод 2 (BreakJoints): применён")
+        task.wait(1)
+        print("Слапы после метода 2: " .. getSlaps() .. " (+" .. (getSlaps() - before) .. ")")
+    end
+    
+    -- Метод 3: Destroy персонажа
+    if target.Character then
+        before = getSlaps()
+        target.Character:Destroy()
+        print("Метод 3 (Destroy): применён")
+        task.wait(1)
+        print("Слапы после метода 3: " .. getSlaps() .. " (+" .. (getSlaps() - before) .. ")")
+    end
+else
+    print("Humanoid НЕ найден!")
+    print("Дети персонажа:")
+    for _, obj in pairs(char:GetChildren()) do
+        print("  " .. obj.Name .. " [" .. obj.ClassName .. "]")
+    end
+end
+
+print("\nИТОГ: Слапы = " .. getSlaps())
+print("Если +0 - ни один метод не убивает по-настоящему")
+print("Если +N - какой-то метод сработал!")
