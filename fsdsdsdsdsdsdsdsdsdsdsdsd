@@ -1,0 +1,205 @@
+-- ТЕСТ ВСЕХ БОЕВЫХ ЭВЕНТОВ НА БАУНТИ
+-- Проверяет Hit, Ability, Slap, Attack, Damage эвенты
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local function findRemote(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteEvent") then return obj end
+    end
+    return nil
+end
+
+-- Все потенциально боевые эвенты (не проверенные ранее)
+local combatEvents = {
+    -- Ability эвенты
+    "GeneralAbility", "UseAbility", "Framework_UseAbility", "ClientUsedAbility",
+    "HunterAbility", "ReverseAbility", "DuelistAbility", "ThorAbility",
+    "CloudAbility", "NimbusAbility", "NullAbility", "RetroAbility",
+    "AdminAbility", "RojoAbility", "HitmanAbility", "GeneralAbility",
+    "RunMasteryAbility", "GlovelMasteryAbility", "KillstreakSoulbankAbility",
+    "DefenseMasteryAbility", "MaceClickAbility", "LeafblowerRAbility",
+    "TinkererRAbility", "CoolerDefaultAbility", "PylonAbility",
+    "DualAbility", "PhaseAbility",
+    
+    -- Hit эвенты (не проверенные)
+    "Errorhit", "PullHit", "PhaseH", "AcHit", "MagnetHIT",
+    "BoomerangH", "DisarmH", "Orbihit", "LinkHit",
+    "TinkererHit", "LeafblowerHit", "UTGHit", "DualHit",
+    "RetributionHit", "PlagueHit", "PylonHit",
+    "MisterHit", "RetroHit", "NimbusHit", "NullHit",
+    "CoolerDefaultHit", "BullHit", "FlexHit", "BrazilHit",
+    "DiceHit", "ReplicaHit", "DefenseHit", "DominanceHit",
+    "ReverseHit", "ShukuchiHit", "DuelistHit",
+    "CULTHit", "bobhit", "WormHit", "ZZZZZZZHit",
+    "CelestialHit", "SpyHit", "DetonatorHit",
+    "Speedrunhit", "Overkillhit", "SlappleHit",
+    "MittenHit", "BubbleHit", "KSHit", "BrickHit",
+    "PusherHit", "IceHit", "SnowHit", "FlashHit",
+    "GoldenHit", "DiamondHit", "GhostHit", "ReaperHit",
+    "BombHit", "CustomHit", "ReHit",
+    
+    -- Special
+    "OnSwing", "b", "Slicer", "Godshand", "TheForce", "TheForce2",
+    "Timestop", "Erase", "Goldify", "Ungoldify", "Spherify",
+    "Counter", "BONK", "HomeRun", "Lamp",
+}
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "CombatScanner"
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 320, 0, 420)
+frame.Position = UDim2.new(0.5, -160, 0.5, -210)
+frame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+frame.BorderSizePixel = 1
+frame.BorderColor3 = Color3.fromRGB(100, 100, 100)
+frame.ClipsDescendants = true
+frame.Active = true
+frame.Parent = gui
+
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 28)
+titleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+titleBar.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -10, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "СКАНЕР БОЕВЫХ ЭВЕНТОВ"
+title.TextColor3 = Color3.fromRGB(255, 150, 50)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 12
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
+
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1, 0, 0, 310)
+scroll.Position = UDim2.new(0, 0, 0, 28)
+scroll.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+scroll.BorderSizePixel = 0
+scroll.CanvasSize = UDim2.new(0, 0, 0, 3000)
+scroll.ScrollBarThickness = 6
+scroll.Parent = frame
+
+local output = Instance.new("TextLabel")
+output.Size = UDim2.new(1, -10, 0, 3000)
+output.Position = UDim2.new(0, 5, 0, 0)
+output.BackgroundTransparency = 1
+output.Text = "Нажми СТАРТ"
+output.TextColor3 = Color3.fromRGB(200, 200, 200)
+output.Font = Enum.Font.SourceSans
+output.TextSize = 12
+output.TextXAlignment = Enum.TextXAlignment.Left
+output.TextYAlignment = Enum.TextYAlignment.Top
+output.TextWrapped = true
+output.Parent = scroll
+
+local outputLines = {}
+local workingList = {}
+local function addOutput(msg)
+    table.insert(outputLines, msg)
+    if #outputLines > 120 then table.remove(outputLines, 1) end
+    output.Text = table.concat(outputLines, "\n")
+end
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(0.9, 0, 0, 20)
+statusLabel.Position = UDim2.new(0.05, 0, 0, 343)
+statusLabel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+statusLabel.Text = "Готов"
+statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusLabel.Font = Enum.Font.SourceSans
+statusLabel.TextSize = 11
+statusLabel.Parent = frame
+
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0.9, 0, 0, 33)
+btn.Position = UDim2.new(0.05, 0, 0, 367)
+btn.BackgroundColor3 = Color3.fromRGB(30, 140, 30)
+btn.Text = "СТАРТ ТЕСТ"
+btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+btn.Font = Enum.Font.SourceSansBold
+btn.TextSize = 14
+btn.Parent = frame
+
+local testing = false
+
+btn.MouseButton1Click:Connect(function()
+    if testing then return end
+    testing = true
+    outputLines = {}
+    workingList = {}
+    addOutput("=== ТЕСТ " .. #combatEvents .. " ЭВЕНТОВ ===\n")
+    
+    task.spawn(function()
+        local char = LocalPlayer.Character
+        if not char then addOutput("❌ Нет персонажа!"); testing = false; return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then addOutput("❌ Нет HRP!"); testing = false; return end
+        
+        for i, name in ipairs(combatEvents) do
+            if not testing then break end
+            
+            local remote = findRemote(name)
+            statusLabel.Text = i .. "/" .. #combatEvents .. ": " .. name
+            
+            if remote then
+                -- Бьём 3 раза с разными аргументами
+                pcall(function() remote:FireServer(hrp) end)
+                task.wait(0.05)
+                pcall(function() remote:FireServer(hrp.Position) end)
+                task.wait(0.05)
+                pcall(function() remote:FireServer() end)
+                task.wait(0.05)
+                pcall(function() remote:FireServer(0) end)
+                
+                addOutput("[" .. i .. "] " .. name .. " - протестирован")
+                table.insert(workingList, name)
+            end
+            
+            -- Пауза каждые 5 эвентов
+            if i % 5 == 0 then
+                task.wait(1.5)
+            else
+                task.wait(0.2)
+            end
+        end
+        
+        addOutput("\n=== ГОТОВО ===")
+        addOutput("Протестировано: " .. #workingList)
+        addOutput("ПРОВЕРЬ БАУНТИ - если выросло, какой-то эвент сработал!")
+        addOutput("Смотри логи выше, какой эвент был последним перед ростом")
+        statusLabel.Text = "Завершено"
+        testing = false
+    end)
+end)
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+print("СКАНЕР БОЕВЫХ ЭВЕНТОВ ГОТОВ")
+print("Нажми СТАРТ и следи за баунти")
+print("Если баунти вырастет - посмотри какой эвент был последним в логах")
+print("Всего: " .. #combatEvents .. " эвентов")
