@@ -1,0 +1,334 @@
+-- МЕГА-ТЕСТ ВСЕХ ЭВЕНТОВ НА БАУНТИ
+-- Тестирует каждый RemoteEvent, пишет какие дают +Slaps
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local workingEvents = {}
+local testedCount = 0
+local totalEvents = 0
+local testing = false
+local testConnection = nil
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MegaEventTester"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 350, 0, 450)
+Frame.Position = UDim2.new(0.5, -175, 0.5, -225)
+Frame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+Frame.BorderSizePixel = 1
+Frame.BorderColor3 = Color3.fromRGB(100, 100, 100)
+Frame.ClipsDescendants = true
+Frame.Active = true
+Frame.Parent = ScreenGui
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 28)
+TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TitleBar.Parent = Frame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -10, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "МЕГА-ТЕСТ ВСЕХ ЭВЕНТОВ"
+Title.TextColor3 = Color3.fromRGB(255, 180, 50)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TitleBar
+
+local TopPanel = Instance.new("Frame")
+TopPanel.Size = UDim2.new(1, 0, 0, 45)
+TopPanel.Position = UDim2.new(0, 0, 0, 28)
+TopPanel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+TopPanel.Parent = Frame
+
+local StartBtn = Instance.new("TextButton")
+StartBtn.Size = UDim2.new(0, 120, 0, 35)
+StartBtn.Position = UDim2.new(0, 10, 0, 5)
+StartBtn.BackgroundColor3 = Color3.fromRGB(30, 140, 30)
+StartBtn.Text = "СТАРТ ТЕСТ"
+StartBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+StartBtn.Font = Enum.Font.SourceSansBold
+StartBtn.TextSize = 14
+StartBtn.Parent = TopPanel
+
+local StopBtn = Instance.new("TextButton")
+StopBtn.Size = UDim2.new(0, 80, 0, 35)
+StopBtn.Position = UDim2.new(0, 140, 0, 5)
+StopBtn.BackgroundColor3 = Color3.fromRGB(140, 30, 30)
+StopBtn.Text = "СТОП"
+StopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+StopBtn.Font = Enum.Font.SourceSansBold
+StopBtn.TextSize = 14
+StopBtn.Parent = TopPanel
+
+local CopyBtn = Instance.new("TextButton")
+CopyBtn.Size = UDim2.new(0, 100, 0, 35)
+CopyBtn.Position = UDim2.new(1, -115, 0, 5)
+CopyBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 140)
+CopyBtn.Text = "КОПИРОВАТЬ"
+CopyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CopyBtn.Font = Enum.Font.SourceSansBold
+CopyBtn.TextSize = 11
+CopyBtn.Parent = TopPanel
+
+local ProgressLabel = Instance.new("TextLabel")
+ProgressLabel.Size = UDim2.new(0, 250, 0, 20)
+ProgressLabel.Position = UDim2.new(0, 10, 0, 76)
+ProgressLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+ProgressLabel.Text = "Прогресс: 0/0 | Найдено: 0"
+ProgressLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+ProgressLabel.Font = Enum.Font.SourceSans
+ProgressLabel.TextSize = 12
+ProgressLabel.Parent = Frame
+
+local CurrentLabel = Instance.new("TextLabel")
+CurrentLabel.Size = UDim2.new(0, 250, 0, 20)
+CurrentLabel.Position = UDim2.new(0, 10, 0, 98)
+CurrentLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+CurrentLabel.Text = "Текущий: -"
+CurrentLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+CurrentLabel.Font = Enum.Font.SourceSans
+CurrentLabel.TextSize = 12
+CurrentLabel.Parent = Frame
+
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Size = UDim2.new(1, 0, 1, -125)
+ScrollFrame.Position = UDim2.new(0, 0, 0, 120)
+ScrollFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+ScrollFrame.BorderSizePixel = 0
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 5000)
+ScrollFrame.ScrollBarThickness = 8
+ScrollFrame.Parent = Frame
+
+local OutputLabel = Instance.new("TextLabel")
+OutputLabel.Size = UDim2.new(1, -10, 0, 5000)
+OutputLabel.Position = UDim2.new(0, 5, 0, 0)
+OutputLabel.BackgroundTransparency = 1
+OutputLabel.Text = "Нажми СТАРТ для тестирования всех эвентов"
+OutputLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+OutputLabel.Font = Enum.Font.SourceSans
+OutputLabel.TextSize = 13
+OutputLabel.TextXAlignment = Enum.TextXAlignment.Left
+OutputLabel.TextYAlignment = Enum.TextYAlignment.Top
+OutputLabel.TextWrapped = true
+OutputLabel.Parent = ScrollFrame
+
+local outputLines = {}
+local function addOutput(msg)
+    table.insert(outputLines, msg)
+    if #outputLines > 200 then table.remove(outputLines, 1) end
+    OutputLabel.Text = table.concat(outputLines, "\n")
+end
+
+-- Функции
+local function getSlaps()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local s = ls:FindFirstChild("Slaps")
+        if s then return s.Value end
+    end
+    return 0
+end
+
+local function testEvent(remote)
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    
+    local beforeSlaps = getSlaps()
+    
+    -- Пробуем разные комбинации аргументов
+    local argSets = {
+        {},
+        {hrp},
+        {hrp.Position},
+        {LocalPlayer},
+        {char},
+        {5},
+        {hrp, 5},
+        {hrp.Position, 5},
+        {LocalPlayer, 5},
+        {Vector3.zero},
+        {0},
+        {1},
+    }
+    
+    for _, args in ipairs(argSets) do
+        pcall(function()
+            remote:FireServer(unpack(args))
+        end)
+        task.wait(0.03)
+    end
+    
+    task.wait(0.2)
+    local afterSlaps = getSlaps()
+    
+    return afterSlaps > beforeSlaps, afterSlaps - beforeSlaps
+end
+
+-- Собираем все RemoteEvent
+local allRemotes = {}
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj:IsA("RemoteEvent") then
+        -- Пропускаем системные
+        local name = obj.Name:lower()
+        if not name:find("cmdr") and not name:find("opera") and not name:find("badge") 
+           and not name:find("friend") and not name:find("sidebar") and not name:find("tournament")
+           and not name:find("bought") and not name:find("gift") and not name:find("trade")
+           and not name:find("setting") and not name:find("daily") and not name:find("twitter")
+           and not name:find("crate") and not name:find("emote") and not name:find("footstep")
+           and not name:find("chat") and not name:find("business") and not name:find("splat")
+           and not name:find("music") and not name:find("radio") and not name:find("prompt")
+           and not name:find("vote") and not name:find("tunnel") and not name:find("display")
+           and not name:find("log") and not name:find("countdown") then
+            table.insert(allRemotes, obj)
+        end
+    end
+end
+
+totalEvents = #allRemotes
+
+-- Тестирование
+local function startTesting()
+    outputLines = {}
+    workingEvents = {}
+    testedCount = 0
+    testing = true
+    
+    addOutput("=== НАЧАЛО ТЕСТИРОВАНИЯ " .. totalEvents .. " ЭВЕНТОВ ===")
+    addOutput("")
+    
+    local index = 1
+    
+    testConnection = RunService.Heartbeat:Connect(function()
+        -- Основной цикл через task.spawn
+    end)
+    
+    task.spawn(function()
+        while testing and index <= totalEvents do
+            local remote = allRemotes[index]
+            local remoteName = remote:GetFullName()
+            
+            testedCount = index
+            CurrentLabel.Text = "Текущий: " .. remoteName
+            ProgressLabel.Text = "Прогресс: " .. testedCount .. "/" .. totalEvents .. " | Найдено: " .. #workingEvents
+            
+            local success, gained = testEvent(remote)
+            
+            if success then
+                local msg = "✅ РАБОТАЕТ: " .. remoteName .. " (+" .. gained .. " Slaps)"
+                addOutput(msg)
+                table.insert(workingEvents, {
+                    name = remoteName,
+                    path = remote:GetFullName(),
+                    gained = gained
+                })
+                ProgressLabel.Text = "Прогресс: " .. testedCount .. "/" .. totalEvents .. " | Найдено: " .. #workingEvents
+            else
+                -- Каждые 10 показываем прогресс
+                if testedCount % 20 == 0 then
+                    addOutput("Тестирую... " .. testedCount .. "/" .. totalEvents .. " | Найдено: " .. #workingEvents)
+                end
+            end
+            
+            index = index + 1
+            task.wait(0.15) -- Задержка между тестами
+        end
+        
+        -- Завершение
+        testing = false
+        addOutput("")
+        addOutput("=== ТЕСТИРОВАНИЕ ЗАВЕРШЕНО ===")
+        addOutput("Протестировано: " .. totalEvents)
+        addOutput("Найдено рабочих: " .. #workingEvents)
+        addOutput("")
+        
+        if #workingEvents > 0 then
+            addOutput("=== РАБОЧИЕ ЭВЕНТЫ ===")
+            for i, ev in ipairs(workingEvents) do
+                addOutput(i .. ". " .. ev.name .. " (+" .. ev.gained .. " Slaps)")
+            end
+        else
+            addOutput("Рабочих эвентов не найдено :(")
+        end
+        
+        ProgressLabel.Text = "Прогресс: " .. totalEvents .. "/" .. totalEvents .. " | Найдено: " .. #workingEvents
+        CurrentLabel.Text = "Текущий: ЗАВЕРШЕНО"
+        StartBtn.BackgroundColor3 = Color3.fromRGB(30, 140, 30)
+        StartBtn.Text = "СТАРТ ТЕСТ"
+    end)
+end
+
+local function stopTesting()
+    testing = false
+    if testConnection then
+        testConnection:Disconnect()
+        testConnection = nil
+    end
+    addOutput("Тест остановлен. Найдено: " .. #workingEvents)
+    CurrentLabel.Text = "Текущий: ОСТАНОВЛЕНО"
+    StartBtn.BackgroundColor3 = Color3.fromRGB(30, 140, 30)
+    StartBtn.Text = "СТАРТ ТЕСТ"
+end
+
+-- Кнопки
+StartBtn.MouseButton1Click:Connect(function()
+    if not testing then
+        StartBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+        StartBtn.Text = "ТЕСТИРУЮ..."
+        startTesting()
+    end
+end)
+
+StopBtn.MouseButton1Click:Connect(function()
+    stopTesting()
+end)
+
+CopyBtn.MouseButton1Click:Connect(function()
+    local text = table.concat(outputLines, "\n")
+    if #workingEvents > 0 then
+        text = text .. "\n\n=== СПИСОК РАБОЧИХ ===\n"
+        for i, ev in ipairs(workingEvents) do
+            text = text .. ev.path .. "\n"
+        end
+    end
+    setclipboard(text)
+    addOutput("📋 Скопировано в буфер!")
+end)
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = Frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+ScreenGui.Destroying:Connect(stopTesting)
+
+print("МЕГА-ТЕСТ ГОТОВ")
+print("Нажми СТАРТ и жди")
+print("Протестирует " .. totalEvents .. " эвентов")
+print("Зелёные ✅ — рабочие, дают баунти")
+print("Займёт ~" .. math.ceil(totalEvents * 0.2 / 60) .. " минут")
