@@ -1,0 +1,63 @@
+-- СУПЕР-ПРОСТОЙ ТЕСТ: Окно на экране
+
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Ищем GeneralAbility
+local ga = nil
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj.Name == "GeneralAbility" then
+        ga = obj
+        break
+    end
+end
+
+-- Создаём окно результата
+local gui = Instance.new("ScreenGui")
+gui.Name = "TestResult"
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 350, 0, 200)
+frame.Position = UDim2.new(0.5, -175, 0.5, -100)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.BorderSizePixel = 2
+frame.BorderColor3 = Color3.fromRGB(100, 100, 100)
+frame.Parent = gui
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, -20, 1, -20)
+label.Position = UDim2.new(0, 10, 0, 10)
+label.BackgroundTransparency = 1
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.Font = Enum.Font.SourceSans
+label.TextSize = 14
+label.TextXAlignment = Enum.TextXAlignment.Left
+label.TextYAlignment = Enum.TextYAlignment.Top
+label.TextWrapped = true
+label.Parent = frame
+
+local text = ""
+
+text = text .. "GeneralAbility: " .. (ga and "НАЙДЕН" or "НЕ НАЙДЕН") .. "\n"
+text = text .. "Персонаж: " .. (LocalPlayer.Character and "ЗАГРУЖЕН" or "НЕТ") .. "\n"
+text = text .. "HRP: " .. (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and "НАЙДЕН" or "НЕТ") .. "\n\n"
+
+if ga and LocalPlayer.Character then
+    local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        text = text .. "Делаю 30 ударов...\n"
+        for i = 1, 30 do
+            pcall(function() ga:FireServer(hrp) end)
+            task.wait(0.03)
+        end
+        text = text .. "ГОТОВО! Проверь баунти над головой.\n"
+        text = text .. "Если +150 - работает без лимита.\n"
+        text = text .. "Если не изменилось - лимит 1000 активен."
+    end
+else
+    text = text .. "ОШИБКА: не могу выполнить удары."
+end
+
+label.Text = text
+print(text)
