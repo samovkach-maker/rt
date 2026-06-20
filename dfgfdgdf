@@ -1,0 +1,112 @@
+--[[
+  АЛЬТЕРНАТИВНЫЙ СПОСОБ ПОЛУЧЕНИЯ БАУНТИ (БЕЗ УДАРОВ)
+  Имитация легальных источников: квесты, зоны, сбор, достижения.
+--]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+
+-- Функция поиска всех RemoteEvent
+local function findRemotes(keyword)
+    local list = {}
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") and string.find(obj.Name:lower(), keyword:lower()) then
+            table.insert(list, obj)
+        end
+    end
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("RemoteEvent") and string.find(obj.Name:lower(), keyword:lower()) then
+            table.insert(list, obj)
+        end
+    end
+    return list
+end
+
+-- 1. Имитация квеста (QuestReward)
+local questRemotes = findRemotes("quest")
+for _, remote in pairs(questRemotes) do
+    remote:FireServer("CompleteQuest", "DailyKill", 5) -- или свои аргументы
+    print("[QUEST] Имитация квеста через " .. remote.Name)
+end
+
+-- 2. Имитация захвата зоны (ZoneCapture)
+local zoneRemotes = findRemotes("zone")
+for _, remote in pairs(zoneRemotes) do
+    remote:FireServer("CaptureZone", "Zone_A", 5)
+    print("[ZONE] Имитация захвата зоны через " .. remote.Name)
+end
+
+-- 3. Имитация сбора предмета (CollectItem)
+local collectRemotes = findRemotes("collect")
+for _, remote in pairs(collectRemotes) do
+    remote:FireServer("CollectItem", "RareGem", 5)
+    print("[COLLECT] Имитация сбора через " .. remote.Name)
+end
+
+-- 4. Имитация достижения (Achievement)
+local achRemotes = findRemotes("achievement")
+for _, remote in pairs(achRemotes) do
+    remote:FireServer("UnlockAchievement", "FirstBlood", 5)
+    print("[ACHIEVEMENT] Имитация достижения через " .. remote.Name)
+end
+
+-- 5. Имитация ежедневной награды (DailyBonus)
+local dailyRemotes = findRemotes("daily")
+for _, remote in pairs(dailyRemotes) do
+    remote:FireServer("ClaimDaily", 1, 5)
+    print("[DAILY] Имитация ежедневки через " .. remote.Name)
+end
+
+-- 6. Имитация взаимодействия с NPC (NPCInteract)
+local npcRemotes = findRemotes("npc")
+for _, remote in pairs(npcRemotes) do
+    remote:FireServer("Interact", "Trader", "Trade", 5)
+    print("[NPC] Имитация взаимодействия через " .. remote.Name)
+end
+
+-- 7. Имитация триггера времени (например, выживание)
+local timerRemotes = findRemotes("timer")
+for _, remote in pairs(timerRemotes) do
+    remote:FireServer("SurviveTime", 300, 5) -- 5 минут = +5 баунти
+    print("[TIMER] Имитация выживания через " .. remote.Name)
+end
+
+-- 8. Прямое изменение leaderstats (если разрешено на клиенте)
+local function tryDirectBounty()
+    local stats = LocalPlayer:FindFirstChild("leaderstats")
+    if stats then
+        local bounty = stats:FindFirstChild("Bounty") or stats:FindFirstChild("Score") or stats:FindFirstChild("Points")
+        if bounty and bounty:IsA("IntValue") or bounty:IsA("NumberValue") then
+            bounty.Value = bounty.Value + 5
+            print("[DIRECT] Прямое изменение: " .. bounty.Name .. " теперь = " .. bounty.Value)
+        end
+    end
+end
+tryDirectBounty()
+
+-- 9. Перебор всех RemoteEvent с любыми ключевыми словами (грубая сила)
+local allRemotes = {}
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj:IsA("RemoteEvent") then
+        table.insert(allRemotes, obj)
+    end
+end
+
+-- Пробуем отправить фейковые аргументы в каждый RemoteEvent
+for _, remote in pairs(allRemotes) do
+    pcall(function()
+        remote:FireServer("GiveBounty", 5)
+        remote:FireServer("AddPoints", 5)
+        remote:FireServer("UpdateScore", 5)
+        remote:FireServer("OnKill", nil, 5)
+        remote:FireServer("Reward", 5)
+        remote:FireServer("Increment", "Bounty", 5)
+        print("[BRUTEFORCE] Отправлено в " .. remote.Name)
+    end)
+end
+
+print("=== ВСЕ СПОСОБЫ БАУНТИ ЗАПУЩЕНЫ ===")
+print("Проверь свой счёт в игре.")
