@@ -1,0 +1,215 @@
+-- ПОИСК УЯЗВИМОСТЕЙ: Тест разных функций игры
+-- Проверяет: слапы напрямую, перчатки, годмод, скорость
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local function findRemote(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteEvent") then return obj end
+    end
+    return nil
+end
+
+local function findFunction(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteFunction") then return obj end
+    end
+    return nil
+end
+
+local results = ""
+
+local function test(name, func)
+    local success, err = pcall(func)
+    if success then
+        results = results .. "✅ " .. name .. " - выполнено\n"
+    else
+        results = results .. "❌ " .. name .. " - " .. tostring(err) .. "\n"
+    end
+end
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "VulnScanner"
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 350, 0, 450)
+frame.Position = UDim2.new(0.5, -175, 0.5, -225)
+frame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+frame.BorderSizePixel = 1
+frame.BorderColor3 = Color3.fromRGB(100, 100, 100)
+frame.ClipsDescendants = true
+frame.Active = true
+frame.Parent = gui
+
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 28)
+titleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+titleBar.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -10, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "СКАНЕР УЯЗВИМОСТЕЙ"
+title.TextColor3 = Color3.fromRGB(255, 150, 50)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 13
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
+
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1, 0, 0, 330)
+scroll.Position = UDim2.new(0, 0, 0, 28)
+scroll.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+scroll.BorderSizePixel = 0
+scroll.CanvasSize = UDim2.new(0, 0, 0, 5000)
+scroll.ScrollBarThickness = 6
+scroll.Parent = frame
+
+local output = Instance.new("TextLabel")
+output.Size = UDim2.new(1, -10, 0, 5000)
+output.Position = UDim2.new(0, 5, 0, 0)
+output.BackgroundTransparency = 1
+output.Text = "Нажми СКАНИРОВАТЬ"
+output.TextColor3 = Color3.fromRGB(200, 200, 200)
+output.Font = Enum.Font.SourceSans
+output.TextSize = 12
+output.TextXAlignment = Enum.TextXAlignment.Left
+output.TextYAlignment = Enum.TextYAlignment.Top
+output.TextWrapped = true
+output.Parent = scroll
+
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0.9, 0, 0, 35)
+btn.Position = UDim2.new(0.05, 0, 0, 365)
+btn.BackgroundColor3 = Color3.fromRGB(30, 140, 30)
+btn.Text = "СКАНИРОВАТЬ ВСЁ"
+btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+btn.Font = Enum.Font.SourceSansBold
+btn.TextSize = 14
+btn.Parent = frame
+
+local copyBtn = Instance.new("TextButton")
+copyBtn.Size = UDim2.new(0.9, 0, 0, 28)
+copyBtn.Position = UDim2.new(0.05, 0, 0, 403)
+copyBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 130)
+copyBtn.Text = "КОПИРОВАТЬ"
+copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+copyBtn.Font = Enum.Font.SourceSansBold
+copyBtn.TextSize = 12
+copyBtn.Parent = frame
+
+btn.MouseButton1Click:Connect(function()
+    results = "=== СКАНЕР УЯЗВИМОСТЕЙ ===\n\n"
+    
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    
+    -- 1. Слапы напрямую
+    results = results .. "--- СЛАПЫ НАПРЯМУЮ ---\n"
+    test("BountyResponse", function()
+        local r = findRemote("BountyResponse")
+        if r then r:FireServer(100) end
+    end)
+    test("AddSlaps Command", function()
+        local r = findRemote("Command")
+        if r then r:FireServer("addslaps", 100) end
+    end)
+    
+    -- 2. Перчатки
+    results = results .. "\n--- ПЕРЧАТКИ ---\n"
+    test("EquipGlove", function()
+        local r = findFunction("CMDRGetGloveIDs") or findFunction("GetGloveIDs")
+        if r then r:InvokeServer() end
+    end)
+    test("UnlockGlove", function()
+        local r = findRemote("SpecialGloveAccess")
+        if r then r:FireServer("All") end
+    end)
+    
+    -- 3. Годмод
+    results = results .. "\n--- ГОДМОД ---\n"
+    test("SetHealth Max", function()
+        if hum then hum.Health = hum.MaxHealth * 100 end
+    end)
+    test("Disable Damage", function()
+        if char then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end)
+    
+    -- 4. Скорость
+    results = results .. "\n--- СКОРОСТЬ ---\n"
+    test("WalkSpeed", function()
+        if hum then hum.WalkSpeed = 100 end
+    end)
+    test("JumpPower", function()
+        if hum then hum.JumpPower = 200 end
+    end)
+    
+    -- 5. Телепорт
+    results = results .. "\n--- ТЕЛЕПОРТ ---\n"
+    test("Teleport to 0,100,0", function()
+        if hrp then hrp.CFrame = CFrame.new(0, 100, 0) end
+    end)
+    
+    -- 6. Атрибуты
+    results = results .. "\n--- АТРИБУТЫ ПЕРСОНАЖА ---\n"
+    test("Set Bounty 0", function()
+        if char then char:SetAttribute("Bounty", 0) end
+    end)
+    test("Set GodMode", function()
+        if char then char:SetAttribute("GodMode", true) end
+    end)
+    
+    -- 7. Прямые манипуляции
+    results = results .. "\n--- ПРЯМЫЕ МАНИПУЛЯЦИИ ---\n"
+    test("Destroy others", function()
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                p.Character:Destroy()
+            end
+        end
+    end)
+    
+    output.Text = results
+    setclipboard(results)
+    print(results)
+end)
+
+copyBtn.MouseButton1Click:Connect(function()
+    setclipboard(results)
+    output.Text = results .. "\n\n📋 СКОПИРОВАНО!"
+end)
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+print("СКАНЕР УЯЗВИМОСТЕЙ ГОТОВ")
+print("Нажми СКАНИРОВАТЬ ВСЁ")
+print("Проверит: слапы, перчатки, годмод, скорость, телепорт")
