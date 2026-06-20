@@ -1,0 +1,239 @@
+-- ТЕСТ КОНКРЕТНЫХ БОЕВЫХ ЭВЕНТОВ: OnSwing и Framework_OnHit
+-- Запусти и жми кнопки по очереди, смотри на Slaps
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local hits = 0
+local lastSlaps = 0
+
+-- Получаем текущие Slaps
+local function getSlaps()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local slaps = ls:FindFirstChild("Slaps")
+        if slaps then return slaps.Value end
+    end
+    return 0
+end
+
+-- Функция для OnSwing
+local function testOnSwing()
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    if not remotes then return "Remotes не найдены" end
+    
+    local onSwing = remotes:FindFirstChild("OnSwing")
+    if not onSwing then return "OnSwing не найден" end
+    
+    local char = LocalPlayer.Character
+    if not char then return "Нет персонажа" end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return "Нет HRP" end
+    
+    -- Пробуем разные варианты
+    pcall(function() onSwing:FireServer() end)
+    pcall(function() onSwing:FireServer("Slap") end)
+    pcall(function() onSwing:FireServer(hrp) end)
+    pcall(function() onSwing:FireServer(hrp.Position) end)
+    
+    return "Вызван OnSwing"
+end
+
+-- Функция для Framework_OnHit
+local function testFrameworkOnHit()
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    if not remotes then return "Remotes не найдены" end
+    
+    local onHit = remotes:FindFirstChild("Framework_OnHit")
+    if not onHit then return "Framework_OnHit не найден" end
+    
+    local char = LocalPlayer.Character
+    if not char then return "Нет персонажа" end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return "Нет HRP" end
+    
+    -- Ищем цель
+    local target = hrp
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local t = p.Character:FindFirstChild("HumanoidRootPart")
+            if t and (t.Position - hrp.Position).Magnitude < 30 then
+                target = t
+                break
+            end
+        end
+    end
+    
+    pcall(function() onHit:FireServer(target, 5) end)
+    pcall(function() onHit:FireServer(target, "Slap") end)
+    pcall(function() onHit:FireServer(target, 1) end)
+    pcall(function() onHit:FireServer(LocalPlayer, target, 5) end)
+    
+    return "Вызван Framework_OnHit"
+end
+
+-- Функция для ReplicatedStorage.b
+local function testB()
+    local b = ReplicatedStorage:FindFirstChild("b")
+    if not b then return "b не найден" end
+    
+    local char = LocalPlayer.Character
+    if not char then return "Нет персонажа" end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return "Нет HRP" end
+    
+    -- Ищем цель
+    local target = nil
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local t = p.Character:FindFirstChild("HumanoidRootPart")
+            if t and (t.Position - hrp.Position).Magnitude < 30 then
+                target = t
+                break
+            end
+        end
+    end
+    
+    if target then
+        pcall(function() b:FireServer(target.Position, target) end)
+        pcall(function() b:FireServer(target) end)
+    end
+    pcall(function() b:FireServer(hrp.Position, hrp) end)
+    
+    return "Вызван b"
+end
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TargetedTest"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 300, 0, 280)
+Frame.Position = UDim2.new(0.5, -150, 0.25, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+Frame.BorderSizePixel = 1
+Frame.BorderColor3 = Color3.fromRGB(100, 100, 100)
+Frame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Title.Text = "ТЕСТ БОЕВЫХ ЭВЕНТОВ"
+Title.TextColor3 = Color3.fromRGB(255, 200, 50)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 15
+Title.Parent = Frame
+
+local SlapsLabel = Instance.new("TextLabel")
+SlapsLabel.Size = UDim2.new(0.9, 0, 0, 25)
+SlapsLabel.Position = UDim2.new(0.05, 0, 0, 35)
+SlapsLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+SlapsLabel.Text = "Slaps: " .. getSlaps()
+SlapsLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+SlapsLabel.Font = Enum.Font.SourceSansBold
+SlapsLabel.TextSize = 14
+SlapsLabel.Parent = Frame
+
+local ResultLabel = Instance.new("TextLabel")
+ResultLabel.Size = UDim2.new(0.9, 0, 0, 20)
+ResultLabel.Position = UDim2.new(0.05, 0, 0, 62)
+ResultLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+ResultLabel.Text = "Результат: -"
+ResultLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+ResultLabel.Font = Enum.Font.SourceSans
+ResultLabel.TextSize = 12
+ResultLabel.Parent = Frame
+
+local Btn1 = Instance.new("TextButton")
+Btn1.Size = UDim2.new(0.9, 0, 0, 40)
+Btn1.Position = UDim2.new(0.05, 0, 0, 90)
+Btn1.BackgroundColor3 = Color3.fromRGB(180, 100, 0)
+Btn1.Text = "ТЕСТ OnSwing"
+Btn1.TextColor3 = Color3.fromRGB(255, 255, 255)
+Btn1.Font = Enum.Font.SourceSansBold
+Btn1.TextSize = 15
+Btn1.Parent = Frame
+
+local Btn2 = Instance.new("TextButton")
+Btn2.Size = UDim2.new(0.9, 0, 0, 40)
+Btn2.Position = UDim2.new(0.05, 0, 0, 135)
+Btn2.BackgroundColor3 = Color3.fromRGB(180, 100, 0)
+Btn2.Text = "ТЕСТ Framework_OnHit"
+Btn2.TextColor3 = Color3.fromRGB(255, 255, 255)
+Btn2.Font = Enum.Font.SourceSansBold
+Btn2.TextSize = 15
+Btn2.Parent = Frame
+
+local Btn3 = Instance.new("TextButton")
+Btn3.Size = UDim2.new(0.9, 0, 0, 40)
+Btn3.Position = UDim2.new(0.05, 0, 0, 180)
+Btn3.BackgroundColor3 = Color3.fromRGB(180, 100, 0)
+Btn3.Text = "ТЕСТ ReplicatedStorage.b"
+Btn3.TextColor3 = Color3.fromRGB(255, 255, 255)
+Btn3.Font = Enum.Font.SourceSansBold
+Btn3.TextSize = 15
+Btn3.Parent = Frame
+
+local Btn4 = Instance.new("TextButton")
+Btn4.Size = UDim2.new(0.9, 0, 0, 35)
+Btn4.Position = UDim2.new(0.05, 0, 0, 225)
+Btn4.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+Btn4.Text = "ОБНОВИТЬ SLAPS"
+Btn4.TextColor3 = Color3.fromRGB(255, 255, 255)
+Btn4.Font = Enum.Font.SourceSansBold
+Btn4.TextSize = 13
+Btn4.Parent = Frame
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = Frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+Btn1.MouseButton1Click:Connect(function()
+    lastSlaps = getSlaps()
+    local res = testOnSwing()
+    ResultLabel.Text = res
+    task.wait(0.3)
+    SlapsLabel.Text = "Slaps: " .. getSlaps() .. " (было: " .. lastSlaps .. ")"
+end)
+
+Btn2.MouseButton1Click:Connect(function()
+    lastSlaps = getSlaps()
+    local res = testFrameworkOnHit()
+    ResultLabel.Text = res
+    task.wait(0.3)
+    SlapsLabel.Text = "Slaps: " .. getSlaps() .. " (было: " .. lastSlaps .. ")"
+end)
+
+Btn3.MouseButton1Click:Connect(function()
+    lastSlaps = getSlaps()
+    local res = testB()
+    ResultLabel.Text = res
+    task.wait(0.3)
+    SlapsLabel.Text = "Slaps: " .. getSlaps() .. " (было: " .. lastSlaps .. ")"
+end)
+
+Btn4.MouseButton1Click:Connect(function()
+    SlapsLabel.Text = "Slaps: " .. getSlaps()
+end)
+
+print("ТЕСТЕР ГОТОВ. Нажми кнопки по очереди.")
+print("Находись рядом с другим игроком!")
+print("Следи за Slaps — если изменились, значит эвент работает")
