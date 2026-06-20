@@ -1,0 +1,82 @@
+-- ТЕСТ САМЫХ ПЕРСПЕКТИВНЫХ ЭВЕНТОВ НА СЛАПЫ
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local function getSlaps()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local s = ls:FindFirstChild("Slaps")
+        if s then return s.Value end
+    end
+    return 0
+end
+
+local function findAny(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name then return obj end
+    end
+    return nil
+end
+
+local startSlaps = getSlaps()
+local results = "=== ТЕСТ СЛАПС-ЭВЕНТОВ ===\n\n"
+results = results .. "Слапы до: " .. startSlaps .. "\n\n"
+
+local testList = {
+    "ClaimDailyReward",
+    "GiftSlaps", 
+    "CollectBadgeQuestReward",
+    "ActivateBadgeQuest",
+    "slapstickfunction",
+    "slapstick",
+    "Swashbuckler_coins",
+    "BountyResponse",
+    "getGlobalLBData",
+    "getRobSkills",
+    "spendMRobSkill",
+    "unlockRobR",
+    "InitialiseGlove",
+    "ShowBoostOnInterface",
+    "Psychokinesis",
+    "Recall",
+    "RecallLastInteractionSteps",
+    "BadgeGiver",
+    "Firework",
+}
+
+for _, name in ipairs(testList) do
+    local obj = findAny(name)
+    if obj then
+        local before = getSlaps()
+        
+        if obj:IsA("RemoteEvent") then
+            pcall(function() obj:FireServer() end)
+            pcall(function() obj:FireServer(LocalPlayer) end)
+            pcall(function() obj:FireServer(100) end)
+            pcall(function() obj:FireServer("claim") end)
+            pcall(function() obj:FireServer("Slaps") end)
+        elseif obj:IsA("RemoteFunction") then
+            pcall(function() obj:InvokeServer() end)
+            pcall(function() obj:InvokeServer(LocalPlayer) end)
+            pcall(function() obj:InvokeServer(100) end)
+            pcall(function() obj:InvokeServer("Slaps") end)
+        end
+        
+        task.wait(0.2)
+        local after = getSlaps()
+        
+        if after > before then
+            results = results .. "✅ " .. name .. ": +" .. (after - before) .. " СЛАПОВ!\n"
+        else
+            results = results .. "❌ " .. name .. "\n"
+        end
+    else
+        results = results .. "⚠️ " .. name .. " не найден\n"
+    end
+end
+
+results = results .. "\nИтог: " .. startSlaps .. " → " .. getSlaps()
+results = results .. " (+" .. (getSlaps() - startSlaps) .. ")"
+
+setclipboard(results)
+print(results)
