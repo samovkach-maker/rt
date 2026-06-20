@@ -1,0 +1,266 @@
+-- ТЕСТ ОБХОДА ЛИМИТА 1000 БАУНТИ
+-- Запусти когда баунти уже 1000 и не растёт
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local function getBounty()
+    -- Баунти висит над головой, пробуем найти через атрибуты
+    if LocalPlayer.Character then
+        local attr = LocalPlayer.Character:GetAttribute("Bounty")
+        if attr then return attr end
+        for _, obj in pairs(LocalPlayer.Character:GetDescendants()) do
+            if obj:IsA("IntValue") and obj.Name:lower():find("bounty") then
+                return obj.Value
+            end
+        end
+    end
+    return "?"
+end
+
+local function findRemote(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteEvent") then
+            return obj
+        end
+    end
+    return nil
+end
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "LimitBypassTest"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 320, 0, 480)
+Frame.Position = UDim2.new(0.5, -160, 0.5, -240)
+Frame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+Frame.BorderSizePixel = 1
+Frame.BorderColor3 = Color3.fromRGB(80, 80, 80)
+Frame.ClipsDescendants = true
+Frame.Active = true
+Frame.Parent = ScreenGui
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 28)
+TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TitleBar.Parent = Frame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -10, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "ТЕСТ ОБХОДА ЛИМИТА 1000 БАУНТИ"
+Title.TextColor3 = Color3.fromRGB(255, 120, 50)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 12
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TitleBar
+
+local InfoLabel = Instance.new("TextLabel")
+InfoLabel.Size = UDim2.new(0.9, 0, 0, 35)
+InfoLabel.Position = UDim2.new(0.05, 0, 0, 33)
+InfoLabel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+InfoLabel.Text = "Баунти: " .. getBounty() .. "\nЗапусти когда достиг лимита"
+InfoLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+InfoLabel.Font = Enum.Font.SourceSans
+InfoLabel.TextSize = 11
+InfoLabel.Parent = Frame
+
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Size = UDim2.new(0.9, 0, 0, 300)
+ScrollFrame.Position = UDim2.new(0.05, 0, 0, 75)
+ScrollFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+ScrollFrame.BorderSizePixel = 0
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 4000)
+ScrollFrame.ScrollBarThickness = 6
+ScrollFrame.Parent = Frame
+
+local OutputLabel = Instance.new("TextLabel")
+OutputLabel.Size = UDim2.new(1, -5, 0, 4000)
+OutputLabel.Position = UDim2.new(0, 3, 0, 0)
+OutputLabel.BackgroundTransparency = 1
+OutputLabel.Text = "Нажимай тесты\n"
+OutputLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+OutputLabel.Font = Enum.Font.SourceSans
+OutputLabel.TextSize = 12
+OutputLabel.TextXAlignment = Enum.TextXAlignment.Left
+OutputLabel.TextYAlignment = Enum.TextYAlignment.Top
+OutputLabel.TextWrapped = true
+OutputLabel.Parent = ScrollFrame
+
+local outputLines = {}
+local function addOutput(msg)
+    table.insert(outputLines, msg)
+    if #outputLines > 100 then table.remove(outputLines, 1) end
+    OutputLabel.Text = table.concat(outputLines, "\n")
+end
+
+-- Список тестов обхода
+local bypassTests = {
+    {"GeneralAbility с отрицательным", function()
+        local r = findRemote("GeneralAbility")
+        if r and LocalPlayer.Character then
+            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                pcall(function() r:FireServer(-1000) end)
+                pcall(function() r:FireServer(hrp, -1000) end)
+            end
+        end
+    end},
+    {"GeneralHit с отрицательным", function()
+        local r = findRemote("GeneralHit")
+        if r and LocalPlayer.Character then
+            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                pcall(function() r:FireServer(hrp, -1000) end)
+            end
+        end
+    end},
+    {"Фармить через ДРУГОГО игрока", function()
+        local r = findRemote("GeneralAbility")
+        local target = nil
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                local tHrp = p.Character:FindFirstChild("HumanoidRootPart")
+                local myHrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if tHrp and myHrp and (tHrp.Position - myHrp.Position).Magnitude < 30 then
+                    target = tHrp
+                    break
+                end
+            end
+        end
+        if r and target then
+            for i = 1, 10 do
+                pcall(function() r:FireServer(target) end)
+                task.wait(0.05)
+            end
+        else
+            addOutput("Нет игрока рядом")
+        end
+    end},
+    {"BountyResponse (прямой вызов)", function()
+        local r = findRemote("BountyResponse")
+        if r then
+            pcall(function() r:FireServer(1000) end)
+            pcall(function() r:FireServer(5) end)
+            pcall(function() r:FireServer("add", 5) end)
+        end
+    end},
+    {"Имитация смерти (без Health=0)", function()
+        local r = findRemote("HumanoidDied")
+        if r and LocalPlayer.Character then
+            pcall(function() r:FireServer(LocalPlayer.Character) end)
+        end
+    end},
+    {"Сброс через атрибуты", function()
+        if LocalPlayer.Character then
+            pcall(function() LocalPlayer.Character:SetAttribute("Bounty", 0) end)
+            pcall(function() LocalPlayer.Character:SetAttribute("bounty", 0) end)
+        end
+    end},
+    {"Прямой сброс leaderstats", function()
+        local ls = LocalPlayer:FindFirstChild("leaderstats")
+        if ls then
+            for _, stat in pairs(ls:GetChildren()) do
+                if stat.Name:lower():find("bounty") then
+                    pcall(function() stat.Value = 0 end)
+                end
+            end
+        end
+    end},
+    {"Перезайти на сервер", function()
+        -- Телепорт в другое место может сбросить
+        game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer)
+    end},
+    {"Спам GeneralAbility x50", function()
+        local r = findRemote("GeneralAbility")
+        if r and LocalPlayer.Character then
+            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                for i = 1, 50 do
+                    pcall(function() r:FireServer(hrp) end)
+                    task.wait(0.03)
+                end
+            end
+        end
+    end},
+    {"Спам GeneralHit x50", function()
+        local r = findRemote("GeneralHit")
+        if r and LocalPlayer.Character then
+            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                for i = 1, 50 do
+                    pcall(function() r:FireServer(hrp) end)
+                    task.wait(0.03)
+                end
+            end
+        end
+    end},
+}
+
+local yPos = 380
+for _, testData in ipairs(bypassTests) do
+    local name = testData[1]
+    local func = testData[2]
+    
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 26)
+    btn.Position = UDim2.new(0.05, 0, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(100, 60, 0)
+    btn.Text = name
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SourceSans
+    btn.TextSize = 10
+    btn.Parent = Frame
+    
+    btn.MouseButton1Click:Connect(function()
+        addOutput("Тест: " .. name)
+        func()
+        task.wait(0.5)
+        addOutput("Баунти после: " .. getBounty())
+        InfoLabel.Text = "Баунти: " .. getBounty()
+    end)
+    
+    yPos = yPos + 28
+end
+
+local RefreshBtn = Instance.new("TextButton")
+RefreshBtn.Size = UDim2.new(0.9, 0, 0, 24)
+RefreshBtn.Position = UDim2.new(0.05, 0, 0, yPos + 5)
+RefreshBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+RefreshBtn.Text = "ОБНОВИТЬ БАУНТИ"
+RefreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+RefreshBtn.Font = Enum.Font.SourceSans
+RefreshBtn.TextSize = 11
+RefreshBtn.Parent = Frame
+
+RefreshBtn.MouseButton1Click:Connect(function()
+    InfoLabel.Text = "Баунти: " .. getBounty()
+end)
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = Frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+print("ТЕСТ ОБХОДА ЛИМИТА ГОТОВ")
+print("Достигни лимита 1000 баунти и нажимай тесты")
+print("Смотри что помогает обойти лимит")
