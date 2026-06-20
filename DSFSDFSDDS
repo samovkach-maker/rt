@@ -1,0 +1,111 @@
+-- ПОИСК УЯЗВИМОСТИ НА СЛАПЫ ЧЕРЕЗ ВСЕ REMOTE FUNCTION
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local results = "=== ПОИСК СЛАПОВ ЧЕРЕЗ RemoteFunction ===\n\n"
+
+local slapsBefore = 0
+local ls = LocalPlayer:FindFirstChild("leaderstats")
+local slapsObj = ls and ls:FindFirstChild("Slaps")
+if slapsObj then slapsBefore = slapsObj.Value end
+
+results = results .. "Слапы до: " .. slapsBefore .. "\n\n"
+
+-- Все функции которые могут быть связаны со слапами
+local funcNames = {
+    "ClaimDailyReward",
+    "BadgeGiver", 
+    "VIPRemote",
+    "TwitterCode",
+    "RedeemTwitterCode",
+    "CMDRGetGloveIDs",
+    "PurchaseCrate",
+    "OpenCrate",
+    "CreateTradeSession",
+    "DeleteItem",
+    "Recall",
+    "RecallLastInteractionSteps",
+    "Psychokinesis",
+    "Excavator",
+    "HasEludeTeleport",
+    "TinkererGetEquippedBots",
+    "HasUserFavorited",
+    "ModerationRemote",
+    "LoadHitEffect",
+    "GetServerLog",
+    "getGlobalLBData",
+    "canUseRobR",
+    "getRobSkills",
+    "MThanosHasMarker",
+}
+
+for _, funcName in ipairs(funcNames) do
+    -- Ищем функцию везде
+    local func = nil
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == funcName and obj:IsA("RemoteFunction") then
+            func = obj
+            break
+        end
+    end
+    
+    if func then
+        results = results .. "Тест: " .. funcName .. "\n"
+        
+        -- Пробуем вызвать с разными аргументами
+        local success, result = pcall(function()
+            return func:InvokeServer()
+        end)
+        if success then
+            results = results .. "  Без аргументов: " .. tostring(result) .. "\n"
+        end
+        
+        success, result = pcall(function()
+            return func:InvokeServer(LocalPlayer)
+        end)
+        if success then
+            results = results .. "  С LocalPlayer: " .. tostring(result) .. "\n"
+        end
+        
+        success, result = pcall(function()
+            return func:InvokeServer(1000)
+        end)
+        if success then
+            results = results .. "  С числом 1000: " .. tostring(result) .. "\n"
+        end
+        
+        task.wait(0.05)
+    else
+        results = results .. "❌ " .. funcName .. " - не найден\n"
+    end
+end
+
+-- Пробуем прямую манипуляцию
+results = results .. "\n--- ПРЯМАЯ МАНИПУЛЯЦИЯ ---\n"
+
+-- Через _NETWORK функции
+for _, obj in pairs(ReplicatedStorage._NETWORK:GetDescendants()) do
+    if obj:IsA("RemoteFunction") then
+        local success, result = pcall(function() return obj:InvokeServer() end)
+        if success and result ~= nil then
+            results = results .. obj.Name .. ": " .. tostring(result) .. "\n"
+        end
+    end
+end
+
+-- Проверка слапов после
+if slapsObj then
+    local slapsAfter = slapsObj.Value
+    results = results .. "\n=== РЕЗУЛЬТАТ ==="
+    results = results .. "\nСлапы до: " .. slapsBefore
+    results = results .. "\nСлапы после: " .. slapsAfter
+    if slapsAfter > slapsBefore then
+        results = results .. "\n✅ СЛАПЫ УВЕЛИЧИЛИСЬ НА " .. (slapsAfter - slapsBefore) .. "!"
+    else
+        results = results .. "\n❌ Слапы не изменились"
+    end
+end
+
+setclipboard(results)
+print(results)
+print("\nСкопировано в буфер!")
