@@ -1,0 +1,220 @@
+-- ЧТО ДАЁТ СЛАПЫ НАПРЯМУЮ? Тест всех методов
+-- Запусти, нажми кнопки, смотри на Slaps (не баунти!)
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local function getSlaps()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local s = ls:FindFirstChild("Slaps")
+        if s then return s.Value end
+    end
+    return 0
+end
+
+local function findRemote(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteEvent") then
+            return obj
+        end
+    end
+    return nil
+end
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SlapsTestGUI"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 310, 0, 430)
+Frame.Position = UDim2.new(0.5, -155, 0.5, -215)
+Frame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+Frame.BorderSizePixel = 1
+Frame.BorderColor3 = Color3.fromRGB(80, 80, 80)
+Frame.ClipsDescendants = true
+Frame.Active = true
+Frame.Parent = ScreenGui
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 28)
+TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TitleBar.Parent = Frame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -10, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "ЧТО ДАЁТ СЛАПЫ НАПРЯМУЮ?"
+Title.TextColor3 = Color3.fromRGB(255, 200, 50)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 13
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TitleBar
+
+local SlapsLabel = Instance.new("TextLabel")
+SlapsLabel.Size = UDim2.new(0.9, 0, 0, 24)
+SlapsLabel.Position = UDim2.new(0.05, 0, 0, 33)
+SlapsLabel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+SlapsLabel.Text = "СЛАПЫ: " .. getSlaps()
+SlapsLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+SlapsLabel.Font = Enum.Font.SourceSansBold
+SlapsLabel.TextSize = 14
+SlapsLabel.Parent = Frame
+
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Size = UDim2.new(0.9, 0, 0, 280)
+ScrollFrame.Position = UDim2.new(0.05, 0, 0, 60)
+ScrollFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+ScrollFrame.BorderSizePixel = 0
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 3500)
+ScrollFrame.ScrollBarThickness = 6
+ScrollFrame.Parent = Frame
+
+local OutputLabel = Instance.new("TextLabel")
+OutputLabel.Size = UDim2.new(1, -5, 0, 3500)
+OutputLabel.Position = UDim2.new(0, 3, 0, 0)
+OutputLabel.BackgroundTransparency = 1
+OutputLabel.Text = "Нажимай кнопки тестов\n"
+OutputLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+OutputLabel.Font = Enum.Font.SourceSans
+OutputLabel.TextSize = 12
+OutputLabel.TextXAlignment = Enum.TextXAlignment.Left
+OutputLabel.TextYAlignment = Enum.TextYAlignment.Top
+OutputLabel.TextWrapped = true
+OutputLabel.Parent = ScrollFrame
+
+local outputLines = {}
+local function addOutput(msg)
+    table.insert(outputLines, msg)
+    if #outputLines > 100 then table.remove(outputLines, 1) end
+    OutputLabel.Text = table.concat(outputLines, "\n")
+end
+
+-- Кнопки тестов
+local tests = {
+    {"GeneralAbility (даёт баунти)", function()
+        local r = findRemote("GeneralAbility")
+        if r and LocalPlayer.Character then
+            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                for i = 1, 3 do pcall(function() r:FireServer(hrp) end); task.wait(0.1) end
+            end
+        end
+    end},
+    {"GeneralHit (даёт баунти)", function()
+        local r = findRemote("GeneralHit")
+        if r and LocalPlayer.Character then
+            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                for i = 1, 3 do pcall(function() r:FireServer(hrp) end); task.wait(0.1) end
+            end
+        end
+    end},
+    {"Убить СЕБЯ (суицид)", function()
+        if LocalPlayer.Character then
+            local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if hum then hum.Health = 0 end
+        end
+    end},
+    {"Убить ДРУГОГО (если рядом)", function()
+        local target = nil
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                local tHrp = p.Character:FindFirstChild("HumanoidRootPart")
+                local myHrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if tHrp and myHrp and (tHrp.Position - myHrp.Position).Magnitude < 30 then
+                    target = p
+                    break
+                end
+            end
+        end
+        if target and target.Character then
+            local hum = target.Character:FindFirstChildOfClass("Humanoid")
+            if hum then hum.Health = 0 end
+        else
+            addOutput("Нет игрока рядом!")
+        end
+    end},
+    {"BountyResponse", function()
+        local r = findRemote("BountyResponse")
+        if r then
+            for i = 1, 3 do pcall(function() r:FireServer(5) end); task.wait(0.1) end
+        end
+    end},
+    {"KillsUpdated", function()
+        local r = findRemote("KillsUpdated")
+        if r then pcall(function() r:FireServer(LocalPlayer) end) end
+    end},
+    {"HumanoidDied", function()
+        local r = findRemote("HumanoidDied")
+        if r and LocalPlayer.Character then
+            pcall(function() r:FireServer(LocalPlayer.Character) end)
+        end
+    end},
+    {"Events.Command addslaps", function()
+        local r = findRemote("Command")
+        if r then
+            pcall(function() r:FireServer("addslaps", "100") end)
+            pcall(function() r:FireServer("giveslaps", "100") end)
+            pcall(function() r:FireServer("slaps", "add", "100") end)
+        end
+    end},
+}
+
+local yPos = 345
+for _, testData in ipairs(tests) do
+    local name = testData[1]
+    local func = testData[2]
+    
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 26)
+    btn.Position = UDim2.new(0.05, 0, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(100, 60, 0)
+    btn.Text = name
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SourceSans
+    btn.TextSize = 10
+    btn.Parent = Frame
+    
+    btn.MouseButton1Click:Connect(function()
+        local before = getSlaps()
+        func()
+        task.wait(1)
+        local after = getSlaps()
+        SlapsLabel.Text = "СЛАПЫ: " .. after
+        if after > before then
+            addOutput("✅ " .. name .. ": +" .. (after - before) .. " СЛАПОВ!")
+        else
+            addOutput("❌ " .. name .. ": 0 слапов")
+        end
+    end)
+    
+    yPos = yPos + 28
+end
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = Frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+print("ТЕСТ СЛАПОВ ГОТОВ")
+print("Цель: найти что даёт СЛАПЫ напрямую")
+print("Нажимай кнопки и смотри на Slaps")
