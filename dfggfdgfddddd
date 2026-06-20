@@ -1,0 +1,118 @@
+-- АКТИВАЦИЯ BOUNTY HUNTER ROOM + ЧТЕНИЕ СКРИПТА ПЕРЧАТКИ
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+
+local results = "=== BOUNTY HUNTER ROOM + СКРИПТ ПЕРЧАТКИ ===\n\n"
+
+-- 1. Читаем скрипт перчатки
+results = results .. "--- СКРИПТ ПЕРЧАТКИ BOUNTY ---\n"
+local char = LocalPlayer.Character
+if char then
+    local bountyTool = char:FindFirstChild("Bounty")
+    if bountyTool then
+        local clientScript = bountyTool:FindFirstChild("bounty_client")
+        if clientScript and clientScript:IsA("LocalScript") then
+            results = results .. "Скрипт найден!\n"
+            pcall(function()
+                results = results .. "Содержимое:\n"
+                results = results .. clientScript.Source .. "\n"
+            end)
+        end
+    end
+end
+
+-- 2. Читаем TotalBounty всех игроков
+results = results .. "\n--- TOTAL BOUNTY ИГРОКОВ ---\n"
+for _, player in ipairs(Players:GetPlayers()) do
+    if player.Character then
+        local tb = player.Character:FindFirstChild("TotalBounty")
+        if tb and tb:IsA("IntValue") then
+            results = results .. player.Name .. ": " .. tb.Value .. " баунти\n"
+        end
+    end
+end
+
+-- 3. Активируем ВСЁ в BountyHunterRoom
+results = results .. "\n--- АКТИВАЦИЯ BOUNTY HUNTER ROOM ---\n"
+local room = Workspace:FindFirstChild("BountyHunterRoom")
+if room then
+    results = results .. "Комната найдена!\n"
+    
+    -- Активируем все ProximityPrompt
+    for _, obj in pairs(room:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") then
+            results = results .. "ProximityPrompt: " .. obj.Parent.Name .. "\n"
+            for i = 1, 3 do
+                pcall(function() fireproximityprompt(obj) end)
+                task.wait(0.1)
+            end
+        end
+        
+        if obj:IsA("ClickDetector") then
+            results = results .. "ClickDetector: " .. obj.Parent.Name .. "\n"
+            for i = 1, 10 do
+                pcall(function() fireclickdetector(obj) end)
+                task.wait(0.05)
+            end
+            results = results .. "  Нажато 10 раз\n"
+        end
+        
+        if obj:IsA("RemoteEvent") then
+            results = results .. "RemoteEvent: " .. obj.Name .. "\n"
+            pcall(function() obj:FireServer() end)
+            pcall(function() obj:FireServer(LocalPlayer) end)
+        end
+    end
+    
+    -- Активируем конкретно PlungerMain и EggTeleport
+    local plunger = room:FindFirstChild("PlungerMain", true)
+    if plunger then
+        local cd = plunger:FindFirstChildOfClass("ClickDetector")
+        if cd then
+            results = results .. "\nPlungerMain: нажимаю 50 раз...\n"
+            for i = 1, 50 do
+                pcall(function() fireclickdetector(cd) end)
+                task.wait(0.05)
+            end
+        end
+    end
+    
+    local egg = room:FindFirstChild("EggTeleport", true)
+    if egg then
+        local cd = egg:FindFirstChildOfClass("ClickDetector")
+        if cd then
+            results = results .. "EggTeleport: нажимаю 50 раз...\n"
+            for i = 1, 50 do
+                pcall(function() fireclickdetector(cd) end)
+                task.wait(0.05)
+            end
+        end
+    end
+end
+
+-- 4. Пробуем дёрнуть WarpPart
+results = results .. "\n--- WARP PART ---\n"
+local warpPart = Workspace:FindFirstChild("_bountyRoomWarpPart", true)
+if warpPart then
+    results = results .. "WarpPart найден: " .. warpPart:GetFullName() .. "\n"
+    if LocalPlayer.Character then
+        local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.CFrame = warpPart.CFrame
+            results = results .. "Телепортирован к WarpPart!\n"
+        end
+    end
+end
+
+-- 5. Проверка слапов
+local slaps = 0
+local ls = LocalPlayer:FindFirstChild("leaderstats")
+if ls then
+    local s = ls:FindFirstChild("Slaps")
+    if s then slaps = s.Value end
+end
+results = results .. "\nСлапы: " .. slaps
+
+setclipboard(results)
+print(results)
