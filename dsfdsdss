@@ -1,0 +1,266 @@
+-- СМЕНА ПЕРЧАТКИ НА ЛЮБУЮ + ТЕСТ НА СЛАПЫ
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local function getSlaps()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local s = ls:FindFirstChild("Slaps")
+        if s then return s.Value end
+    end
+    return 0
+end
+
+local function getGlove()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local g = ls:FindFirstChild("Glove")
+        if g then return g.Value end
+    end
+    return "?"
+end
+
+local function setGlove(name)
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local g = ls:FindFirstChild("Glove")
+        if g then
+            g.Value = name
+            return true
+        end
+    end
+    return false
+end
+
+local function findRemote(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteEvent") then return obj end
+    end
+    return nil
+end
+
+-- Список популярных перчаток для теста
+local popularGloves = {
+    "Bounty", "Overkill", "God", "Admin", "Custom", "Flex", "Default",
+    "Diamond", "ZZZZZZZ", "Bob", "Reaper", "Bomb", "Killerfish",
+    "Retribution", "Hitman", "Thor", "Cloud", "Null", "Nimbus",
+    "Cooler", "Retro", "Duelist", "Reverse", "Shukuchi", "Dominance",
+    "Defense", "Plague", "Tinkerer", "Leafblower", "UTG", "Dual",
+    "Phase", "Magnet", "Error", "Pull", "Golden", "Ghost", "Flash",
+    "Ice", "Snow", "Pusher", "Brick", "KS", "Mitten", "Bubble",
+    "Slapple", "Brazil", "Dice", "Replica", "Bull", "Mister"
+}
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "GloveSwitcherGUI"
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 320, 0, 450)
+frame.Position = UDim2.new(0.5, -160, 0.5, -225)
+frame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+frame.BorderSizePixel = 1
+frame.BorderColor3 = Color3.fromRGB(100, 100, 100)
+frame.ClipsDescendants = true
+frame.Active = true
+frame.Parent = gui
+
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 28)
+titleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+titleBar.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -10, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "СМЕНА ПЕРЧАТКИ + ТЕСТ"
+title.TextColor3 = Color3.fromRGB(255, 200, 100)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 13
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
+
+local infoLabel = Instance.new("TextLabel")
+infoLabel.Size = UDim2.new(0.95, 0, 0, 35)
+infoLabel.Position = UDim2.new(0.025, 0, 0, 32)
+infoLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+infoLabel.Text = "Перчатка: " .. getGlove() .. " | Слапы: " .. getSlaps()
+infoLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+infoLabel.Font = Enum.Font.SourceSansBold
+infoLabel.TextSize = 12
+infoLabel.Parent = frame
+
+local input = Instance.new("TextBox")
+input.Size = UDim2.new(0.6, 0, 0, 28)
+input.Position = UDim2.new(0.025, 0, 0, 72)
+input.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+input.Text = ""
+input.PlaceholderText = "Название перчатки"
+input.TextColor3 = Color3.fromRGB(255, 255, 255)
+input.Font = Enum.Font.SourceSans
+input.TextSize = 13
+input.Parent = frame
+
+local setBtn = Instance.new("TextButton")
+setBtn.Size = UDim2.new(0.35, 0, 0, 28)
+setBtn.Position = UDim2.new(0.625, 0, 0, 72)
+setBtn.BackgroundColor3 = Color3.fromRGB(180, 100, 0)
+setBtn.Text = "СМЕНИТЬ"
+setBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+setBtn.Font = Enum.Font.SourceSansBold
+setBtn.TextSize = 13
+setBtn.Parent = frame
+
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(0.95, 0, 0, 250)
+scroll.Position = UDim2.new(0.025, 0, 0, 105)
+scroll.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+scroll.BorderSizePixel = 0
+scroll.CanvasSize = UDim2.new(0, 0, 0, 3000)
+scroll.ScrollBarThickness = 6
+scroll.Parent = frame
+
+local glovesList = Instance.new("TextLabel")
+glovesList.Size = UDim2.new(1, -5, 0, 3000)
+glovesList.Position = UDim2.new(0, 3, 0, 0)
+glovesList.BackgroundTransparency = 1
+glovesList.Text = ""
+glovesList.TextColor3 = Color3.fromRGB(200, 200, 200)
+glovesList.Font = Enum.Font.SourceSans
+glovesList.TextSize = 12
+glovesList.TextXAlignment = Enum.TextXAlignment.Left
+glovesList.TextYAlignment = Enum.TextYAlignment.Top
+glovesList.TextWrapped = true
+glovesList.Parent = scroll
+
+-- Кнопки популярных перчаток
+local y = 360
+for _, gloveName in ipairs(popularGloves) do
+    if y > 430 then break end -- Только 3 ряда
+    
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.18, 0, 0, 22)
+    btn.Position = UDim2.new(0.025 + ((#popularGloves % 5) * 0.19), 0, 0, y)
+    btn.BackgroundColor3 = Color3.fromRGB(80, 60, 0)
+    btn.Text = gloveName
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SourceSans
+    btn.TextSize = 9
+    btn.Parent = frame
+    
+    btn.MouseButton1Click:Connect(function()
+        input.Text = gloveName
+        setGlove(gloveName)
+        infoLabel.Text = "Перчатка: " .. getGlove() .. " | Слапы: " .. getSlaps()
+    end)
+end
+
+local testBtn = Instance.new("TextButton")
+testBtn.Size = UDim2.new(0.45, 0, 0, 30)
+testBtn.Position = UDim2.new(0.025, 0, 0, 405)
+testBtn.BackgroundColor3 = Color3.fromRGB(140, 60, 0)
+testBtn.Text = "ТЕСТ СПОСОБНОСТИ"
+testBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+testBtn.Font = Enum.Font.SourceSansBold
+testBtn.TextSize = 12
+testBtn.Parent = frame
+
+local farmBtn = Instance.new("TextButton")
+farmBtn.Size = UDim2.new(0.45, 0, 0, 30)
+farmBtn.Position = UDim2.new(0.5, 0, 0, 405)
+farmBtn.BackgroundColor3 = Color3.fromRGB(30, 130, 30)
+farmBtn.Text = "ФАРМ ТЕКУЩЕЙ"
+farmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+farmBtn.Font = Enum.Font.SourceSansBold
+farmBtn.TextSize = 12
+farmBtn.Parent = frame
+
+setBtn.MouseButton1Click:Connect(function()
+    local gloveName = input.Text
+    if gloveName ~= "" then
+        setGlove(gloveName)
+        infoLabel.Text = "Перчатка: " .. getGlove() .. " | Слапы: " .. getSlaps()
+    end
+end)
+
+testBtn.MouseButton1Click:Connect(function()
+    local before = getSlaps()
+    local glove = getGlove()
+    
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    -- Тестируем способности
+    local remotes = {"GeneralAbility", "GeneralHit", "UseAbility", "Framework_UseAbility"}
+    for _, name in ipairs(remotes) do
+        local r = findRemote(name)
+        if r then
+            for i = 1, 5 do
+                pcall(function() r:FireServer(hrp) end)
+                task.wait(0.05)
+            end
+        end
+    end
+    
+    task.wait(0.3)
+    local after = getSlaps()
+    infoLabel.Text = "Перчатка: " .. glove .. " | Слапы: " .. after
+    
+    if after > before then
+        glovesList.Text = "✅ " .. glove .. " ДАЛА СЛАПЫ! +" .. (after - before) .. "\n" .. glovesList.Text
+    else
+        glovesList.Text = "❌ " .. glove .. " не дала слапов\n" .. glovesList.Text
+    end
+end)
+
+farmBtn.MouseButton1Click:Connect(function()
+    local glove = getGlove()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    local ga = findRemote("GeneralAbility")
+    local gh = findRemote("GeneralHit")
+    
+    infoLabel.Text = "Фарм " .. glove + "..."
+    
+    task.spawn(function()
+        for i = 1, 20 do
+            if ga then pcall(function() ga:FireServer(hrp) end) end
+            task.wait(0.03)
+            if gh then pcall(function() gh:FireServer(hrp) end) end
+            task.wait(0.05)
+        end
+        infoLabel.Text = "Перчатка: " .. getGlove() .. " | Слапы: " .. getSlaps()
+    end)
+end)
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+print("СМЕНА ПЕРЧАТОК ГОТОВА")
+print("1. Выбери перчатку из списка или введи название")
+print("2. Нажми СМЕНИТЬ")
+print("3. Нажми ТЕСТ СПОСОБНОСТИ чтобы проверить слапы")
+print("4. Нажми ФАРМ ТЕКУЩЕЙ для фарма")
+print("Попробуй Overkill, God, Admin!")
