@@ -1,0 +1,282 @@
+-- ПОЛНЫЙ ТЕСТ С ТАЙМАУТОМ (пропускает зависающие)
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local function getSlaps()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local s = ls:FindFirstChild("Slaps")
+        if s then return s.Value end
+    end
+    return 0
+end
+
+local allRemotes = {}
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+        table.insert(allRemotes, obj)
+    end
+end
+
+-- Пропускаем проблемные
+local skipList = {
+    "HasUserFavorited", "ModerationRemote", "VIPRemote",
+    "GetPlatform", "getGlobalLBData", "HasEludeTeleport",
+    "CMDRGetGloveIDs", "IsTwitterVerified", "Recall",
+    "RecallLastInteractionSteps", "Psychokinesis", "Excavator",
+    "TinkererGetEquippedBots", "MThanosHasMarker",
+    "canUseRobR", "getRobSkills", "GetServerLog",
+    "LoadHitEffect", "RequestGiftingRecipient",
+    "PurchaseItem", "CreateTradeSession", "CancelTrade",
+}
+
+local startSlaps = getSlaps()
+local found = {}
+local tested = 0
+local skipped = 0
+local testing = false
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "FastTestGUI"
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 350, 0, 320)
+frame.Position = UDim2.new(0.5, -175, 0.5, -160)
+frame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+frame.BorderSizePixel = 1
+frame.BorderColor3 = Color3.fromRGB(100, 100, 100)
+frame.Active = true
+frame.Parent = gui
+
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 28)
+titleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+titleBar.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -10, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "ТЕСТ " .. #allRemotes .. " ЭВЕНТОВ (быстрый)"
+title.TextColor3 = Color3.fromRGB(255, 180, 50)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 13
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(0.9, 0, 0, 22)
+statusLabel.Position = UDim2.new(0.05, 0, 0, 33)
+statusLabel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+statusLabel.Text = "Слапы: " .. startSlaps .. " | Готов"
+statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+statusLabel.Font = Enum.Font.SourceSansBold
+statusLabel.TextSize = 12
+statusLabel.Parent = frame
+
+local progressLabel = Instance.new("TextLabel")
+progressLabel.Size = UDim2.new(0.9, 0, 0, 20)
+progressLabel.Position = UDim2.new(0.05, 0, 0, 57)
+progressLabel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+progressLabel.Text = "0/" .. #allRemotes .. " | Найдено: 0 | Пропущено: 0"
+progressLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+progressLabel.Font = Enum.Font.SourceSans
+progressLabel.TextSize = 11
+progressLabel.Parent = frame
+
+local currentLabel = Instance.new("TextLabel")
+currentLabel.Size = UDim2.new(0.9, 0, 0, 18)
+currentLabel.Position = UDim2.new(0.05, 0, 0, 79)
+currentLabel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+currentLabel.Text = ""
+currentLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+currentLabel.Font = Enum.Font.SourceSans
+currentLabel.TextSize = 11
+currentLabel.Parent = frame
+
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(0.9, 0, 0, 140)
+scroll.Position = UDim2.new(0.05, 0, 0, 100)
+scroll.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+scroll.BorderSizePixel = 0
+scroll.CanvasSize = UDim2.new(0, 0, 0, 3000)
+scroll.ScrollBarThickness = 6
+scroll.Parent = frame
+
+local foundLabel = Instance.new("TextLabel")
+foundLabel.Size = UDim2.new(1, -5, 0, 3000)
+foundLabel.Position = UDim2.new(0, 3, 0, 0)
+foundLabel.BackgroundTransparency = 1
+foundLabel.Text = ""
+foundLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+foundLabel.Font = Enum.Font.SourceSans
+foundLabel.TextSize = 12
+foundLabel.TextXAlignment = Enum.TextXAlignment.Left
+foundLabel.TextYAlignment = Enum.TextYAlignment.Top
+foundLabel.TextWrapped = true
+foundLabel.Parent = scroll
+
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0.55, 0, 0, 33)
+btn.Position = UDim2.new(0.05, 0, 0, 247)
+btn.BackgroundColor3 = Color3.fromRGB(30, 150, 30)
+btn.Text = "СТАРТ"
+btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+btn.Font = Enum.Font.SourceSansBold
+btn.TextSize = 14
+btn.Parent = frame
+
+local stopBtn = Instance.new("TextButton")
+stopBtn.Size = UDim2.new(0.35, 0, 0, 33)
+stopBtn.Position = UDim2.new(0.6, 0, 0, 247)
+stopBtn.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
+stopBtn.Text = "СТОП"
+stopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+stopBtn.Font = Enum.Font.SourceSansBold
+stopBtn.TextSize = 14
+stopBtn.Parent = frame
+
+local copyBtn = Instance.new("TextButton")
+copyBtn.Size = UDim2.new(0.9, 0, 0, 24)
+copyBtn.Position = UDim2.new(0.05, 0, 0, 283)
+copyBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 150)
+copyBtn.Text = "КОПИРОВАТЬ"
+copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+copyBtn.Font = Enum.Font.SourceSansBold
+copyBtn.TextSize = 12
+copyBtn.Parent = frame
+
+-- Функция с таймаутом
+local function safeInvoke(func, ...)
+    local result = nil
+    local done = false
+    local thread = task.spawn(function()
+        pcall(function()
+            result = func(...)
+        end)
+        done = true
+    end)
+    
+    local waited = 0
+    while not done and waited < 1 do
+        task.wait(0.1)
+        waited = waited + 0.1
+    end
+    
+    if not done then
+        task.cancel(thread)
+        return nil, "timeout"
+    end
+    
+    return result
+end
+
+btn.MouseButton1Click:Connect(function()
+    if testing then return end
+    testing = true
+    found = {}
+    tested = 0
+    skipped = 0
+    foundLabel.Text = ""
+    
+    task.spawn(function()
+        for i, obj in ipairs(allRemotes) do
+            if not testing then break end
+            
+            local name = obj.Name
+            
+            -- Пропускаем проблемные
+            local skip = false
+            for _, s in ipairs(skipList) do
+                if name == s then skip = true; break end
+            end
+            
+            if skip then
+                skipped = skipped + 1
+                progressLabel.Text = i .. "/" .. #allRemotes .. " | Найдено: " .. #found .. " | Пропущено: " .. skipped
+                continue
+            end
+            
+            currentLabel.Text = "#" .. i .. " " .. name
+            progressLabel.Text = i .. "/" .. #allRemotes .. " | Найдено: " .. #found .. " | Пропущено: " .. skipped
+            
+            local before = getSlaps()
+            
+            if obj:IsA("RemoteEvent") then
+                pcall(function() obj:FireServer() end)
+                pcall(function() obj:FireServer(LocalPlayer) end)
+                pcall(function() obj:FireServer(100) end)
+                pcall(function() obj:FireServer("Slaps") end)
+                task.wait(0.02)
+            elseif obj:IsA("RemoteFunction") then
+                -- Вызываем с таймаутом
+                safeInvoke(function() return obj:InvokeServer() end)
+                task.wait(0.02)
+                safeInvoke(function() return obj:InvokeServer(LocalPlayer) end)
+                task.wait(0.02)
+                safeInvoke(function() return obj:InvokeServer(100) end)
+            end
+            
+            task.wait(0.03)
+            local after = getSlaps()
+            tested = i
+            
+            if after > before then
+                local msg = "✅ #" .. i .. " " .. name .. " +" .. (after - before)
+                table.insert(found, msg)
+                foundLabel.Text = foundLabel.Text .. msg .. "\n"
+                statusLabel.Text = "НАЙДЕН! " .. name
+                statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+                setclipboard(foundLabel.Text)
+            end
+            
+            if i % 30 == 0 then
+                statusLabel.Text = "Тест " .. i .. "/" .. #allRemotes
+                task.wait(0.5)
+            end
+        end
+        
+        testing = false
+        statusLabel.Text = "Готово! Найдено: " .. #found
+        statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        progressLabel.Text = tested .. "/" .. #allRemotes .. " | Найдено: " .. #found
+        currentLabel.Text = ""
+    end)
+end)
+
+stopBtn.MouseButton1Click:Connect(function()
+    testing = false
+    statusLabel.Text = "Стоп | " .. tested .. "/" .. #allRemotes
+    statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+end)
+
+copyBtn.MouseButton1Click:Connect(function()
+    setclipboard(foundLabel.Text)
+    statusLabel.Text = "Скопировано!"
+end)
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+print("ТЕСТ С ТАЙМАУТОМ ГОТОВ")
+print("Пропускает HasUserFavorited и подобные")
+print("Нажми СТАРТ")
