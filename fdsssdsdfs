@@ -1,0 +1,260 @@
+-- ТЕСТ 50 ОТОБРАННЫХ БОЕВЫХ ЭВЕНТОВ (БЕЗ СПАМА)
+-- Только хиты, абилки, и связанное с баунти
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local function getSlaps()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local s = ls:FindFirstChild("Slaps")
+        if s then return s.Value end
+    end
+    return 0
+end
+
+local function findRemote(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteEvent") then
+            return obj
+        end
+    end
+    return nil
+end
+
+-- 50 отобранных эвентов — только боевые
+local selectedEvents = {
+    -- Основные боевые
+    "GeneralHit",
+    "GeneralAbility",
+    "OnSwing",
+    "b",
+    "Framework_OnHit",
+    "Framework_UseAbility",
+    "ClientUsedAbility",
+    
+    -- Хиты способностей
+    "DiamondHit", "GhostHit", "SnowHit", "FlashHit", "GoldenHit",
+    "BombHit", "ReaperHit", "IceHit", "PusherHit", "BrickHit",
+    "KSHit", "MittenHit", "BubbleHit", "ReHit", "SlappleHit",
+    "CustomHit", "RetributionHit", "HitmanHit", "ThorHit",
+    "CloudHit", "NimbusHit", "NullHit", "CoolerDefaultHit",
+    "BullHit", "FlexHit", "BrazilHit", "DiceHit", "ReplicaHit",
+    "DefenseHit", "DominanceHit", "ReverseHit", "ShukuchiHit",
+    "DuelistHit", "BoomerangH", "DisarmH", "Orbihit", "LinkHit",
+    "MisterHit", "RetroHit", "PlagueHit", "PylonHit",
+    "TinkererHit", "LeafblowerHit", "UTGHit", "DualHit",
+    "PhaseH", "AcHit", "MagnetHIT", "Errorhit", "PullHit",
+}
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SelectedTestGUI"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 300, 0, 420)
+Frame.Position = UDim2.new(0.5, -150, 0.5, -210)
+Frame.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+Frame.BorderSizePixel = 1
+Frame.BorderColor3 = Color3.fromRGB(80, 80, 80)
+Frame.ClipsDescendants = true
+Frame.Active = true
+Frame.Parent = ScreenGui
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 28)
+TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TitleBar.Parent = Frame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -10, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "ТЕСТ 50 БОЕВЫХ ЭВЕНТОВ"
+Title.TextColor3 = Color3.fromRGB(255, 180, 50)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 13
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TitleBar
+
+local SlapsLabel = Instance.new("TextLabel")
+SlapsLabel.Size = UDim2.new(0.9, 0, 0, 22)
+SlapsLabel.Position = UDim2.new(0.05, 0, 0, 33)
+SlapsLabel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+SlapsLabel.Text = "Slaps: " .. getSlaps()
+SlapsLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+SlapsLabel.Font = Enum.Font.SourceSansBold
+SlapsLabel.TextSize = 12
+SlapsLabel.Parent = Frame
+
+local ProgressLabel = Instance.new("TextLabel")
+ProgressLabel.Size = UDim2.new(0.9, 0, 0, 20)
+ProgressLabel.Position = UDim2.new(0.05, 0, 0, 57)
+ProgressLabel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+ProgressLabel.Text = "Прогресс: 0/" .. #selectedEvents
+ProgressLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+ProgressLabel.Font = Enum.Font.SourceSans
+ProgressLabel.TextSize = 11
+ProgressLabel.Parent = Frame
+
+local BtnStart = Instance.new("TextButton")
+BtnStart.Size = UDim2.new(0.9, 0, 0, 35)
+BtnStart.Position = UDim2.new(0.05, 0, 0, 82)
+BtnStart.BackgroundColor3 = Color3.fromRGB(30, 140, 30)
+BtnStart.Text = "СТАРТ ТЕСТ"
+BtnStart.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnStart.Font = Enum.Font.SourceSansBold
+BtnStart.TextSize = 14
+BtnStart.Parent = Frame
+
+local BtnStop = Instance.new("TextButton")
+BtnStop.Size = UDim2.new(0.9, 0, 0, 28)
+BtnStop.Position = UDim2.new(0.05, 0, 0, 120)
+BtnStop.BackgroundColor3 = Color3.fromRGB(130, 30, 30)
+BtnStop.Text = "СТОП"
+BtnStop.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnStop.Font = Enum.Font.SourceSansBold
+BtnStop.TextSize = 12
+BtnStop.Parent = Frame
+
+local BtnCopy = Instance.new("TextButton")
+BtnCopy.Size = UDim2.new(0.9, 0, 0, 26)
+BtnCopy.Position = UDim2.new(0.05, 0, 0, 150)
+BtnCopy.BackgroundColor3 = Color3.fromRGB(40, 40, 130)
+BtnCopy.Text = "КОПИРОВАТЬ"
+BtnCopy.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnCopy.Font = Enum.Font.SourceSansBold
+BtnCopy.TextSize = 11
+BtnCopy.Parent = Frame
+
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Size = UDim2.new(0.9, 0, 0, 220)
+ScrollFrame.Position = UDim2.new(0.05, 0, 0, 180)
+ScrollFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+ScrollFrame.BorderSizePixel = 0
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 3000)
+ScrollFrame.ScrollBarThickness = 6
+ScrollFrame.Parent = Frame
+
+local OutputLabel = Instance.new("TextLabel")
+OutputLabel.Size = UDim2.new(1, -5, 0, 3000)
+OutputLabel.Position = UDim2.new(0, 3, 0, 0)
+OutputLabel.BackgroundTransparency = 1
+OutputLabel.Text = "Нажми СТАРТ"
+OutputLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+OutputLabel.Font = Enum.Font.SourceSans
+OutputLabel.TextSize = 12
+OutputLabel.TextXAlignment = Enum.TextXAlignment.Left
+OutputLabel.TextYAlignment = Enum.TextYAlignment.Top
+OutputLabel.TextWrapped = true
+OutputLabel.Parent = ScrollFrame
+
+local outputLines = {}
+local workingList = {}
+local testing = false
+local stopped = false
+
+local function addOutput(msg)
+    table.insert(outputLines, msg)
+    if #outputLines > 120 then table.remove(outputLines, 1) end
+    OutputLabel.Text = table.concat(outputLines, "\n")
+end
+
+BtnStart.MouseButton1Click:Connect(function()
+    if testing then return end
+    testing = true
+    stopped = false
+    outputLines = {}
+    workingList = {}
+    
+    addOutput("=== ТЕСТ 50 ЭВЕНТОВ ===\n")
+    
+    task.spawn(function()
+        for i, eventName in ipairs(selectedEvents) do
+            if not testing or stopped then break end
+            
+            local remote = findRemote(eventName)
+            ProgressLabel.Text = i .. "/" .. #selectedEvents
+            
+            if remote then
+                local char = LocalPlayer.Character
+                if not char then
+                    addOutput("❌ Нет персонажа")
+                    break
+                end
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if not hrp then break end
+                
+                local before = getSlaps()
+                
+                -- 3 вызова с паузой
+                pcall(function() remote:FireServer(hrp) end)
+                task.wait(0.15)
+                pcall(function() remote:FireServer(hrp.Position) end)
+                task.wait(0.15)
+                pcall(function() remote:FireServer() end)
+                
+                task.wait(0.5)
+                local after = getSlaps()
+                local gained = after - before
+                
+                if gained > 0 then
+                    addOutput("✅ " .. eventName .. ": +" .. gained)
+                    table.insert(workingList, eventName)
+                    SlapsLabel.Text = "Slaps: " .. after .. " (+" .. gained .. ")"
+                end
+                
+                -- Пауза каждые 3 эвента
+                if i % 3 == 0 then
+                    addOutput("⏳ пауза 2 сек...")
+                    task.wait(2)
+                else
+                    task.wait(0.3)
+                end
+            end
+        end
+        
+        testing = false
+        addOutput("\n=== ГОТОВО ===")
+        addOutput("Рабочих: " .. #workingList)
+        for i, name in ipairs(workingList) do
+            addOutput("  " .. i .. ". " .. name)
+        end
+    end)
+end)
+
+BtnStop.MouseButton1Click:Connect(function()
+    stopped = true
+    testing = false
+    addOutput("⏹ Остановлено")
+end)
+
+BtnCopy.MouseButton1Click:Connect(function()
+    setclipboard(table.concat(outputLines, "\n"))
+    addOutput("📋 Скопировано!")
+end)
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = Frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+print("ТЕСТ 50 ЭВЕНТОВ ГОТОВ")
+print("Тест займёт ~3 минуты")
+print("Не кикнет — паузы по 2 сек каждые 3 эвента")
