@@ -1,0 +1,248 @@
+-- ФАРМ БАУНТИ НА ДРУГОМ + УБИЙСТВО = СЛАПЫ ТЕБЕ
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local function findRemote(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteEvent") then return obj end
+    end
+    return nil
+end
+
+local function getSlaps()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local s = ls:FindFirstChild("Slaps")
+        if s then return s.Value end
+    end
+    return 0
+end
+
+local ga = findRemote("GeneralAbility")
+local gh = findRemote("GeneralHit")
+
+local farming = false
+local targetPlayer = nil
+local slapsStart = 0
+local kills = 0
+local slapsGained = 0
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "FarmOtherGUI"
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 280)
+frame.Position = UDim2.new(0.5, -150, 0.5, -140)
+frame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+frame.BorderSizePixel = 1
+frame.BorderColor3 = Color3.fromRGB(80, 80, 80)
+frame.Parent = gui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 28)
+title.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+title.Text = "ФАРМ НА ДРУГОМ → СЛАПЫ ТЕБЕ"
+title.TextColor3 = Color3.fromRGB(100, 255, 100)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 12
+title.Parent = frame
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(0.9, 0, 0, 25)
+statusLabel.Position = UDim2.new(0.05, 0, 0, 33)
+statusLabel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+statusLabel.Text = "Цель: не выбрана"
+statusLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+statusLabel.Font = Enum.Font.SourceSansBold
+statusLabel.TextSize = 12
+statusLabel.Parent = frame
+
+local targetLabel = Instance.new("TextLabel")
+targetLabel.Size = UDim2.new(0.9, 0, 0, 50)
+targetLabel.Position = UDim2.new(0.05, 0, 0, 60)
+targetLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+targetLabel.Text = "Список игроков:\n"
+targetLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+targetLabel.Font = Enum.Font.SourceSans
+targetLabel.TextSize = 11
+targetLabel.Parent = frame
+
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0.55, 0, 0, 35)
+btn.Position = UDim2.new(0.05, 0, 0, 165)
+btn.BackgroundColor3 = Color3.fromRGB(30, 150, 30)
+btn.Text = "СТАРТ ЦИКЛ"
+btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+btn.Font = Enum.Font.SourceSansBold
+btn.TextSize = 13
+btn.Parent = frame
+
+local pickBtn = Instance.new("TextButton")
+pickBtn.Size = UDim2.new(0.35, 0, 0, 35)
+pickBtn.Position = UDim2.new(0.6, 0, 0, 165)
+pickBtn.BackgroundColor3 = Color3.fromRGB(80, 60, 0)
+pickBtn.Text = "ВЫБРАТЬ"
+pickBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+pickBtn.Font = Enum.Font.SourceSansBold
+pickBtn.TextSize = 12
+pickBtn.Parent = frame
+
+local statsLabel = Instance.new("TextLabel")
+statsLabel.Size = UDim2.new(0.9, 0, 0, 40)
+statsLabel.Position = UDim2.new(0.05, 0, 0, 205)
+statsLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+statsLabel.Text = "Слапы: " .. getSlaps() .. "\nУбийств: 0 | +Слапов: 0"
+statsLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+statsLabel.Font = Enum.Font.SourceSans
+statsLabel.TextSize = 12
+statsLabel.Parent = frame
+
+local input = Instance.new("TextBox")
+input.Size = UDim2.new(0.9, 0, 0, 25)
+input.Position = UDim2.new(0.05, 0, 0, 135)
+input.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+input.Text = ""
+input.PlaceholderText = "Имя игрока (или random)"
+input.TextColor3 = Color3.fromRGB(255, 255, 255)
+input.Font = Enum.Font.SourceSans
+input.TextSize = 12
+input.Parent = frame
+
+-- Обновление списка игроков
+local function updatePlayerList()
+    local text = "Игроки рядом:\n"
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            text = text .. "• " .. p.Name .. "\n"
+        end
+    end
+    targetLabel.Text = text
+end
+
+updatePlayerList()
+
+pickBtn.MouseButton1Click:Connect(function()
+    local name = input.Text
+    if name == "" or name == "random" then
+        -- Случайный игрок
+        local list = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then table.insert(list, p) end
+        end
+        if #list > 0 then
+            targetPlayer = list[math.random(1, #list)]
+        end
+    else
+        targetPlayer = Players:FindFirstChild(name)
+    end
+    
+    if targetPlayer then
+        statusLabel.Text = "Цель: " .. targetPlayer.Name
+        statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    else
+        statusLabel.Text = "Игрок не найден!"
+        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    end
+end)
+
+btn.MouseButton1Click:Connect(function()
+    if farming then
+        farming = false
+        btn.Text = "СТАРТ ЦИКЛ"
+        btn.BackgroundColor3 = Color3.fromRGB(30, 150, 30)
+        return
+    end
+    
+    if not targetPlayer then
+        statusLabel.Text = "Сначала выбери цель!"
+        return
+    end
+    
+    farming = true
+    kills = 0
+    slapsGained = 0
+    slapsStart = getSlaps()
+    btn.Text = "СТОП"
+    btn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+    
+    task.spawn(function()
+        while farming do
+            if not targetPlayer or not targetPlayer.Character then
+                statusLabel.Text = "Цель умерла, жду респавна..."
+                task.wait(2)
+                updatePlayerList()
+            end
+            
+            if targetPlayer and targetPlayer.Character then
+                local targetHrp = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if targetHrp then
+                    -- Телепорт цели ко мне
+                    local myChar = LocalPlayer.Character
+                    if myChar then
+                        local myHrp = myChar:FindFirstChild("HumanoidRootPart")
+                        if myHrp then
+                            targetHrp.CFrame = myHrp.CFrame + Vector3.new(0, 5, 0)
+                        end
+                    end
+                    
+                    task.wait(0.2)
+                    
+                    -- Фармим баунти на цели (50 ударов)
+                    statusLabel.Text = "Фарм баунти на " .. targetPlayer.Name
+                    for i = 1, 50 do
+                        if not farming then break end
+                        if ga then pcall(function() ga:FireServer(targetHrp) end) end
+                        task.wait(0.03)
+                        if gh then pcall(function() gh:FireServer(targetHrp) end) end
+                        task.wait(0.03)
+                    end
+                    
+                    -- Убиваем цель
+                    statusLabel.Text = "Убиваю " .. targetPlayer.Name
+                    local hum = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+                    if hum and hum.Health > 0 then
+                        hum.Health = 0
+                        kills = kills + 1
+                    end
+                    
+                    -- Проверяем слапы
+                    local currentSlaps = getSlaps()
+                    slapsGained = currentSlaps - slapsStart
+                    statsLabel.Text = "Слапы: " .. currentSlaps .. "\nУбийств: " .. kills .. " | +Слапов: " .. slapsGained
+                    
+                    statusLabel.Text = "Убито! Жду респавна..."
+                    task.wait(3)
+                end
+            end
+        end
+    end)
+end)
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+print("ФАРМ НА ДРУГОМ ГОТОВ")
+print("1. Введи имя игрока или random")
+print("2. Нажми ВЫБРАТЬ")
+print("3. Нажми СТАРТ ЦИКЛ")
+print("Фармит баунти на цели → убивает → ты получаешь слапы")
