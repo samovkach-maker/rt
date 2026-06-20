@@ -1,0 +1,176 @@
+-- ТЕСТ ИМИТАЦИИ ХИТА: Бьём воздух, себя, без цели
+-- Запусти и жми кнопки, смотри на Slaps
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local function getSlaps()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local s = ls:FindFirstChild("Slaps")
+        if s then return s.Value end
+    end
+    return 0
+end
+
+local function findGeneralHit()
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == "GeneralHit" and obj:IsA("RemoteEvent") then
+            return obj
+        end
+    end
+    return nil
+end
+
+local lastSlaps = 0
+local generalHit = findGeneralHit()
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "HitSimTest"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 310, 0, 350)
+Frame.Position = UDim2.new(0.5, -155, 0.15, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+Frame.BorderSizePixel = 1
+Frame.BorderColor3 = Color3.fromRGB(100, 100, 100)
+Frame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 28)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Title.Text = "ТЕСТ ИМИТАЦИИ ХИТА"
+Title.TextColor3 = Color3.fromRGB(255, 200, 50)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 14
+Title.Parent = Frame
+
+local SlapsLabel = Instance.new("TextLabel")
+SlapsLabel.Size = UDim2.new(0.9, 0, 0, 22)
+SlapsLabel.Position = UDim2.new(0.05, 0, 0, 33)
+SlapsLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+SlapsLabel.Text = "Slaps: " .. getSlaps()
+SlapsLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+SlapsLabel.Font = Enum.Font.SourceSansBold
+SlapsLabel.TextSize = 13
+SlapsLabel.Parent = Frame
+
+local Result = Instance.new("TextLabel")
+Result.Size = UDim2.new(0.9, 0, 0, 22)
+Result.Position = UDim2.new(0.05, 0, 0, 57)
+Result.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Result.Text = "Результат: -"
+Result.TextColor3 = Color3.fromRGB(200, 200, 200)
+Result.Font = Enum.Font.SourceSans
+Result.TextSize = 12
+Result.Parent = Frame
+
+local y = 85
+
+-- Создаём кнопки для разных тестов
+local tests = {
+    {"Без аргументов", {}},
+    {"Пустая таблица", {{}}},
+    {"Только 0", {0}},
+    {"Только 5", {5}},
+    {"Только true", {true}},
+    {"Только Vector3.zero", {Vector3.zero}},
+    {"Бить себя (LocalPlayer)", {LocalPlayer}},
+    {"Бить себя (Character)", {LocalPlayer.Character}},
+    {"Бить себя (HRP)", {LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")}},
+    {"Vector3 + 5", {Vector3.zero, 5}},
+    {"nil, 5", {nil, 5}},
+    {"\"Hit\"", {"Hit"}},
+    {"\"Slap\"", {"Slap"}},
+    {"0, 0, 0", {0, 0, 0}},
+}
+
+for _, test in ipairs(tests) do
+    local name = test[1]
+    local args = test[2]
+    
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 32)
+    btn.Position = UDim2.new(0.05, 0, 0, y)
+    btn.BackgroundColor3 = Color3.fromRGB(140, 80, 0)
+    btn.Text = name
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SourceSans
+    btn.TextSize = 12
+    btn.Parent = Frame
+    
+    btn.MouseButton1Click:Connect(function()
+        if not generalHit then
+            generalHit = findGeneralHit()
+        end
+        if not generalHit then
+            Result.Text = "GeneralHit не найден!"
+            return
+        end
+        
+        lastSlaps = getSlaps()
+        
+        -- Отправляем хит 3 раза
+        for i = 1, 3 do
+            pcall(function()
+                generalHit:FireServer(unpack(args))
+            end)
+            task.wait(0.05)
+        end
+        
+        task.wait(0.3)
+        local newSlaps = getSlaps()
+        SlapsLabel.Text = "Slaps: " .. newSlaps .. " (было: " .. lastSlaps .. ")"
+        
+        if newSlaps > lastSlaps then
+            Result.Text = "РАБОТАЕТ! +" .. (newSlaps - lastSlaps) .. " | Аргументы: " .. name
+            Result.TextColor3 = Color3.fromRGB(100, 255, 100)
+        else
+            Result.Text = "Нет изменений | " .. name
+            Result.TextColor3 = Color3.fromRGB(255, 150, 150)
+        end
+    end)
+    
+    y = y + 35
+end
+
+local RefreshBtn = Instance.new("TextButton")
+RefreshBtn.Size = UDim2.new(0.9, 0, 0, 28)
+RefreshBtn.Position = UDim2.new(0.05, 0, 0, y + 5)
+RefreshBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+RefreshBtn.Text = "ОБНОВИТЬ SLAPS"
+RefreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+RefreshBtn.Font = Enum.Font.SourceSansBold
+RefreshBtn.TextSize = 12
+RefreshBtn.Parent = Frame
+
+RefreshBtn.MouseButton1Click:Connect(function()
+    SlapsLabel.Text = "Slaps: " .. getSlaps()
+end)
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = Frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+print("ТЕСТ ИМИТАЦИИ ГОТОВ")
+print("Нажимай каждую кнопку и смотри на Slaps")
+print("Если какая-то сработает - напиши название кнопки")
