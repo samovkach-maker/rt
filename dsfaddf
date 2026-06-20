@@ -1,0 +1,135 @@
+-- ПРОСТОЙ ТЕСТ ОБХОДА ЛИМИТА (без GUI)
+-- Запусти и смотри консоль (F9)
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local function findRemote(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteEvent") then
+            return obj
+        end
+    end
+    return nil
+end
+
+local results = "=== ТЕСТ ОБХОДА ЛИМИТА 1000 БАУНТИ ===\n\n"
+
+local function test(name, func)
+    results = results .. "Тест: " .. name .. "\n"
+    local success, err = pcall(func)
+    if not success then
+        results = results .. "  ОШИБКА: " .. tostring(err) .. "\n"
+    end
+    results = results .. "\n"
+end
+
+-- Тест 1: Спам GeneralAbility x100
+test("Спам GeneralAbility x100", function()
+    local r = findRemote("GeneralAbility")
+    if r and LocalPlayer.Character then
+        local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            for i = 1, 100 do
+                pcall(function() r:FireServer(hrp) end)
+                task.wait(0.02)
+            end
+            results = results .. "  Выполнено 100 вызовов\n"
+        end
+    else
+        results = results .. "  GeneralAbility или персонаж не найден\n"
+    end
+end)
+
+-- Тест 2: Бить другого игрока
+test("Бить другого игрока", function()
+    local r = findRemote("GeneralAbility")
+    local target = nil
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local t = p.Character:FindFirstChild("HumanoidRootPart")
+            if t then target = t; break end
+        end
+    end
+    if r and target then
+        for i = 1, 20 do
+            pcall(function() r:FireServer(target) end)
+            task.wait(0.05)
+        end
+        results = results .. "  Ударил другого игрока 20 раз\n"
+    else
+        results = results .. "  Нет цели рядом\n"
+    end
+end)
+
+-- Тест 3: Отрицательное значение
+test("Отрицательное значение", function()
+    local r = findRemote("GeneralAbility")
+    if r then
+        pcall(function() r:FireServer(-500) end)
+        pcall(function() r:FireServer("-1000") end)
+    end
+    local r2 = findRemote("GeneralHit")
+    if r2 then
+        pcall(function() r2:FireServer(nil, -500) end)
+    end
+    results = results .. "  Отправлены отрицательные значения\n"
+end)
+
+-- Тест 4: BountyResponse
+test("BountyResponse", function()
+    local r = findRemote("BountyResponse")
+    if r then
+        pcall(function() r:FireServer(0) end)
+        pcall(function() r:FireServer(-1000) end)
+        pcall(function() r:FireServer("reset") end)
+        pcall(function() r:FireServer("clear") end)
+        results = results .. "  Отправлены команды сброса\n"
+    else
+        results = results .. "  BountyResponse не найден\n"
+    end
+end)
+
+-- Тест 5: Имитация смерти
+test("Имитация смерти", function()
+    local r = findRemote("HumanoidDied")
+    if r and LocalPlayer.Character then
+        pcall(function() r:FireServer(LocalPlayer.Character) end)
+        results = results .. "  Отправлен сигнал смерти\n"
+    end
+end)
+
+-- Тест 6: Сброс атрибутов
+test("Сброс атрибутов", function()
+    if LocalPlayer.Character then
+        pcall(function() LocalPlayer.Character:SetAttribute("Bounty", 0) end)
+        pcall(function() LocalPlayer.Character:SetAttribute("bounty", 0) end)
+        pcall(function() LocalPlayer.Character:SetAttribute("Bounti", 0) end)
+        results = results .. "  Атрибуты сброшены\n"
+    end
+end)
+
+-- Тест 7: Спам Hit эвентов
+test("Спам ВСЕХ Hit эвентов", function()
+    local hitNames = {"DiamondHit", "GoldenHit", "BombHit", "ReaperHit", "IceHit", "SnowHit", "FlashHit"}
+    for _, name in ipairs(hitNames) do
+        local r = findRemote(name)
+        if r and LocalPlayer.Character then
+            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                pcall(function() r:FireServer(hrp) end)
+            end
+        end
+    end
+    results = results .. "  Пройдены все Hit эвенты\n"
+end)
+
+-- Итог
+results = results .. "\n=== ТЕСТЫ ЗАВЕРШЕНЫ ===\n"
+results = results .. "Проверь баунти над головой.\n"
+results = results .. "Если превысил 1000 - обход найден!\n"
+
+setclipboard(results)
+print(results)
+print("\nСкопировано в буфер! Ctrl+V")
