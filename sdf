@@ -1,250 +1,152 @@
--- СУПЕР-ДИАГНОСТИКА: Перехват клика мыши и всего что за ним следует
--- Запусти, нажми ЗАПИСЬ, кликни левой кнопкой для удара печаткой 1 раз, жди 2 сек
+-- СКАНЕР СТАРОГО GUI: Вытаскивает все связи кнопок и RemoteEvent из запущенного GUI фарма
+-- Сначала запусти старый скрипт чтобы GUI появился, потом этот
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local UserInputService = game:GetService("UserInputService")
-local ContextActionService = game:GetService("ContextActionService")
-local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
+local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local logData = ""
-local recording = false
-local startTime = 0
 
-local function log(cat, msg)
-    local t = string.format("%.4f", tick() - startTime)
-    local entry = "[" .. t .. "][" .. cat .. "] " .. tostring(msg)
-    logData = logData .. entry .. "\n"
-    if #logData > 100000 then
-        logData = string.sub(logData, 1, 100000) .. "\n[ОБРЕЗАНО]"
-    end
+local function log(msg)
+    logData = logData .. msg .. "\n"
+    print(msg)
 end
 
--- 1. Перехватываем все InputBegan на всех объектах
-local function hookAllInputs()
-    -- UserInputService
-    local uisConns = getconnections(UserInputService.InputBegan)
-    for i, conn in ipairs(uisConns) do
-        log("UIS.InputBegan", "Найдено соединение #" .. i)
-        pcall(function()
-            local func = conn.Function
-            if func then
-                local info = debug.getinfo(func, "nS")
-                log("UIS.InputBegan.Func", "Имя: " .. (info.name or "?") .. " | Источник: " .. (info.short_src or "?"))
-            end
-        end)
-    end
+local function scanGUI()
+    logData = ""
+    log("========== СКАНИРОВАНИЕ СТАРОГО GUI ==========")
+    log("Время: " .. os.date("%H:%M:%S"))
+    log("")
     
-    -- GuiService
-    local guiConns = getconnections(GuiService.TouchMoved)
-    -- Пропускаем, фокус на InputBegan
-    
-    -- Все кнопки в PlayerGui
-    for _, obj in pairs(LocalPlayer.PlayerGui:GetDescendants()) do
-        if obj:IsA("TextButton") or obj:IsA("ImageButton") or obj:IsA("GuiButton") then
-            local conns = getconnections(obj.MouseButton1Click)
-            if #conns > 0 then
-                log("GUI.Button", obj:GetFullName() .. " имеет " .. #conns .. " соединений")
-                for i, conn in ipairs(conns) do
-                    pcall(function()
-                        local func = conn.Function
-                        if func then
-                            local info = debug.getinfo(func, "nS")
-                            log("GUI.Button.Func", obj.Name .. " #" .. i .. " -> " .. (info.name or "?") .. " @ " .. (info.short_src or "?"))
+    for _, gui in pairs(playerGui:GetChildren()) do
+        if gui:IsA("ScreenGui") then
+            log("GUI НАЙДЕН: " .. gui.Name)
+            log("  Детей: " .. #gui:GetChildren())
+            
+            for _, child in pairs(gui:GetDescendants()) do
+                -- Кнопки
+                if child:IsA("TextButton") or child:IsA("ImageButton") then
+                    log("")
+                    log("  КНОПКА: " .. child.Name)
+                    log("  Текст: " .. (child:IsA("TextButton") and child.Text or "(image)"))
+                    
+                    -- Смотрим все соединения
+                    local events = {"MouseButton1Click", "MouseButton1Down", "MouseButton1Up", "Activated", "MouseEnter", "MouseLeave"}
+                    for _, eventName in ipairs(events) do
+                        local conns = getconnections(child[eventName])
+                        if #conns > 0 then
+                            log("  Событие: " .. eventName .. " (" .. #conns .. " соединений)")
+                            for i, conn in ipairs(conns) do
+                                local func = conn.Function
+                                if func then
+                                    -- Пытаемся получить исходный код функции
+                                    local info = debug.getinfo(func, "nS")
+                                    log("    #" .. i .. " Функция: " .. (info.name or "anonymous"))
+                                    log("    Источник: " .. (info.short_src or "?"))
+                                    log("    Строка: " .. (info.linedefined or "?"))
+                                    
+                                    -- Пытаемся декомпилировать функцию
+                                    local success, decompiled = pcall(function()
+                                        return debug.getupvalues(func)
+                                    end)
+                                    if success and decompiled then
+                                        for j, upval in ipairs(decompiled) do
+                                            local valStr
+                                            if type(upval) == "function" then
+                                                local upInfo = debug.getinfo(upval, "n")
+                                                valStr = "function:" .. (upInfo.name or "?")
+                                            elseif typeof(upval) == "Instance" then
+                                                pcall(function() valStr = upval:GetFullName() end)
+                                                if not valStr then valStr = upval.ClassName .. ":" .. upval.Name end
+                                            elseif type(upval) == "string" then
+                                                valStr = '"' .. upval .. '"'
+                                            elseif type(upval) == "number" then
+                                                valStr = tostring(upval)
+                                            elseif upval == nil then
+                                                valStr = "nil"
+                                            else
+                                                valStr = tostring(upval)
+                                            end
+                                            log("    Upvalue[" .. j .. "]: " .. valStr)
+                                        end
+                                    end
+                                end
+                            end
                         end
+                    end
+                end
+                
+                -- Скрипты
+                if child:IsA("LocalScript") or child:IsA("ModuleScript") then
+                    log("")
+                    log("  СКРИПТ: " .. child.Name .. " [" .. child.ClassName .. "]")
+                    log("  ======== КОД ========")
+                    pcall(function()
+                        log(child.Source)
                     end)
+                    log("  =====================")
+                end
+                
+                -- Текстовые поля
+                if child:IsA("TextBox") then
+                    log("")
+                    log("  TEXTBOX: " .. child.Name)
+                    log("  Placeholder: " .. child.PlaceholderText)
+                    log("  Text: " .. child.Text)
+                end
+                
+                -- Лейблы с важным текстом
+                if child:IsA("TextLabel") and child.Text ~= "" then
+                    -- Только значимые лейблы
+                    if string.find(child.Text, "bounty") or string.find(child.Text, "Bounty") or
+                       string.find(child.Text, "баунти") or string.find(child.Text, "фарм") or
+                       string.find(child.Text, "farm") or string.find(child.Text, "слап") or
+                       string.find(child.Text, "slap") then
+                        log("  ЛЕЙБЛ: " .. child.Name .. " = '" .. child.Text .. "'")
+                    end
                 end
             end
         end
     end
     
-    -- ContextActionService
-    local boundActions = ContextActionService:GetAllBoundActionInfo()
-    for action, info in pairs(boundActions) do
-        log("ContextAction", action .. " привязан")
-    end
+    log("")
+    log("========== СКАНИРОВАНИЕ ЗАВЕРШЕНО ==========")
+    setclipboard(logData)
 end
 
--- 2. Перехват FireServer и InvokeServer с полным стеком вызовов
-local mt = getrawmetatable(game)
-local oldNamecall = mt.__namecall
-setreadonly(mt, false)
-mt.__namecall = function(self, ...)
-    local method = getnamecallmethod()
-    
-    if (method == "FireServer" or method == "InvokeServer") and recording then
-        local remotePath = "?"
-        pcall(function() remotePath = self:GetFullName() end)
-        
-        local argStr = ""
-        for i = 1, select("#", ...) do
-            local arg = select(i, ...)
-            local valStr
-            if arg == nil then valStr = "nil"
-            elseif type(arg) == "string" then valStr = '"' .. arg .. '"'
-            elseif type(arg) == "number" then valStr = tostring(arg)
-            elseif type(arg) == "boolean" then valStr = arg and "true" or "false"
-            elseif typeof(arg) == "Vector3" then valStr = string.format("V3(%.1f,%.1f,%.1f)", arg.X, arg.Y, arg.Z)
-            elseif typeof(arg) == "CFrame" then valStr = string.format("CF(%.1f,%.1f,%.1f)", arg.Position.X, arg.Position.Y, arg.Position.Z)
-            elseif typeof(arg) == "Instance" then valStr = arg.ClassName .. ":" .. arg.Name
-            elseif type(arg) == "table" then
-                local c = 0; pcall(function() for _, _ in pairs(arg) do c = c + 1; if c > 5 then break end end end)
-                valStr = "Table[" .. c .. "]"
-            else valStr = tostring(arg) .. "<" .. typeof(arg) .. ">"
-            end
-            argStr = argStr .. "[" .. i .. "]=" .. valStr .. " "
-        end
-        
-        log(method, remotePath .. " | " .. argStr)
-        
-        -- Снимаем стек вызовов
-        local trace = debug.traceback("", 2)
-        log("STACK", "\n" .. trace)
-    end
-    
-    return oldNamecall(self, ...)
-end
-setreadonly(mt, true)
-
--- 3. Перехват OnClientEvent
-for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-    if obj:IsA("RemoteEvent") then
-        obj.OnClientEvent:Connect(function(...)
-            if not recording then return end
-            local args = {...}
-            if #args > 0 then
-                local argStr = ""
-                for i = 1, math.min(#args, 3) do
-                    argStr = argStr .. "[" .. i .. "]=" .. tostring(args[i]) .. " "
-                end
-                log("OnClientEvent", obj.Name .. " | " .. argStr)
-            end
-        end)
-    end
-end
-
--- 4. Мониторинг Tool (печатка)
-LocalPlayer.CharacterAdded:Connect(function(char)
-    wait(0.5)
-    for _, obj in pairs(char:GetDescendants()) do
-        if obj:IsA("Tool") then
-            log("CHAR.Tool", "Найдена печатка: " .. obj.Name)
-            obj.Activated:Connect(function()
-                if recording then
-                    log("TOOL.Activated", obj.Name .. " АКТИВИРОВАНА!")
-                end
-            end)
-            obj.Equipped:Connect(function()
-                log("TOOL.Equipped", obj.Name .. " экипирована")
-            end)
-        end
-    end
-end)
-
--- Инициализация
-hookAllInputs()
-
--- GUI
+-- GUI для сканирования
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "UltraDiagGUI"
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-ScreenGui.ResetOnSpawn = false
+ScreenGui.Name = "OldScriptScanner"
+ScreenGui.Parent = playerGui
 
-local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 320, 0, 150)
-Frame.Position = UDim2.new(0.5, -160, 0.1, 0)
-Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-Frame.BorderSizePixel = 1
-Frame.BorderColor3 = Color3.fromRGB(100, 100, 100)
-Frame.Parent = ScreenGui
-
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 28)
-Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-Title.Text = "УЛЬТРА-ДИАГНОСТИКА КЛИКА"
-Title.TextColor3 = Color3.fromRGB(255, 180, 50)
-Title.Font = Enum.Font.SourceSansBold
-Title.TextSize = 14
-Title.Parent = Frame
+local Button = Instance.new("TextButton")
+Button.Size = UDim2.new(0, 280, 0, 50)
+Button.Position = UDim2.new(0.5, -140, 0.05, 0)
+Button.BackgroundColor3 = Color3.fromRGB(200, 120, 0)
+Button.Text = "СКАНИРОВАТЬ СТАРЫЙ GUI"
+Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+Button.Font = Enum.Font.SourceSansBold
+Button.TextSize = 16
+Button.Parent = ScreenGui
 
 local Status = Instance.new("TextLabel")
-Status.Size = UDim2.new(0.9, 0, 0, 25)
-Status.Position = UDim2.new(0.05, 0, 0, 35)
-Status.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-Status.Text = "Готов"
+Status.Size = UDim2.new(0, 280, 0, 25)
+Status.Position = UDim2.new(0.5, -140, 0.05 + 55, 0)
+Status.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Status.Text = "Запусти старый GUI и нажми сюда"
 Status.TextColor3 = Color3.fromRGB(200, 200, 200)
 Status.Font = Enum.Font.SourceSans
 Status.TextSize = 12
-Status.Parent = Frame
+Status.Parent = ScreenGui
 
-local RecordBtn = Instance.new("TextButton")
-RecordBtn.Size = UDim2.new(0.9, 0, 0, 45)
-RecordBtn.Position = UDim2.new(0.05, 0, 0, 65)
-RecordBtn.BackgroundColor3 = Color3.fromRGB(180, 80, 0)
-RecordBtn.Text = "НАЧАТЬ ЗАПИСЬ И УДАРИТЬ"
-RecordBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-RecordBtn.Font = Enum.Font.SourceSansBold
-RecordBtn.TextSize = 15
-RecordBtn.Parent = Frame
-
-local Info = Instance.new("TextLabel")
-Info.Size = UDim2.new(0.9, 0, 0, 25)
-Info.Position = UDim2.new(0.05, 0, 0, 115)
-Info.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-Info.Text = "После записи Ctrl+V в блокнот"
-Info.TextColor3 = Color3.fromRGB(150, 150, 150)
-Info.Font = Enum.Font.SourceSans
-Info.TextSize = 11
-Info.Parent = Frame
-
--- Перетаскивание
-local UIS = game:GetService("UserInputService")
-local dragging, dragStart, startPos = false, nil, nil
-Frame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = Frame.Position
-    end
-end)
-UIS.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Position - dragStart
-        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
+Button.MouseButton1Click:Connect(function()
+    Status.Text = "Сканирую..."
+    scanGUI()
+    Status.Text = "ГОТОВО! Смотри консоль и Ctrl+V"
 end)
 
-RecordBtn.MouseButton1Click:Connect(function()
-    logData = ""
-    recording = true
-    startTime = tick()
-    log("SYSTEM", "=== УЛЬТРА-ДИАГНОСТИКА НАЧАЛАСЬ ===")
-    log("SYSTEM", "КЛИКНИ ЛЕВОЙ КНОПКОЙ МЫШИ ДЛЯ УДАРА ПЕЧАТКОЙ!")
-    Status.Text = "ЗАПИСЬ! КЛИКНИ ДЛЯ УДАРА!"
-    RecordBtn.BackgroundColor3 = Color3.fromRGB(200, 30, 30)
-    RecordBtn.Text = "ИДЁТ ЗАПИСЬ... КЛИКАЙ!"
-    
-    task.delay(2.5, function()
-        if recording then
-            recording = false
-            log("SYSTEM", "=== ЗАПИСЬ ОСТАНОВЛЕНА ===")
-            setclipboard(logData)
-            Status.Text = "ГОТОВО! Ctrl+V"
-            RecordBtn.BackgroundColor3 = Color3.fromRGB(180, 80, 0)
-            RecordBtn.Text = "НАЧАТЬ ЗАПИСЬ И УДАРИТЬ"
-            print("========== УЛЬТРА-ДИАГНОСТИКА ==========")
-            print(logData)
-            print("========== КОНЕЦ ==========")
-        end
-    end)
-end)
-
-print("УЛЬТРА-ДИАГНОСТИКА ГОТОВА")
-print("Нажми кнопку, кликни мышкой для удара, жди 2.5 сек, Ctrl+V")
+print("СКАНЕР СТАРОГО GUI ГОТОВ")
+print("1. Запусти старый скрипт фарма чтобы GUI появился")
+print("2. Нажми СКАНИРОВАТЬ СТАРЫЙ GUI")
+print("3. Покажи мне всё что выведет в консоль")
