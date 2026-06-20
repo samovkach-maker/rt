@@ -1,0 +1,292 @@
+-- ПОИСК УЯЗВИМОСТЕЙ ЧЕРЕЗ ПЕРЧАТКИ
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+
+local results = ""
+local workingGloves = {}
+
+local function getSlaps()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local s = ls:FindFirstChild("Slaps")
+        if s then return s.Value end
+    end
+    return 0
+end
+
+local function getGlove()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local g = ls:FindFirstChild("Glove")
+        if g then return g.Value end
+    end
+    return "?"
+end
+
+local function findRemote(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteEvent") then return obj end
+    end
+    return nil
+end
+
+local function findFunction(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteFunction") then return obj end
+    end
+    return nil
+end
+
+local slapsBefore = getSlaps()
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "GloveExploitGUI"
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 350, 0, 500)
+frame.Position = UDim2.new(0.5, -175, 0.5, -250)
+frame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+frame.BorderSizePixel = 1
+frame.BorderColor3 = Color3.fromRGB(100, 100, 100)
+frame.ClipsDescendants = true
+frame.Active = true
+frame.Parent = gui
+
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 28)
+titleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+titleBar.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -10, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "УЯЗВИМОСТИ ЧЕРЕЗ ПЕРЧАТКИ"
+title.TextColor3 = Color3.fromRGB(255, 200, 100)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 13
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
+
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1, 0, 0, 390)
+scroll.Position = UDim2.new(0, 0, 0, 28)
+scroll.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+scroll.BorderSizePixel = 0
+scroll.CanvasSize = UDim2.new(0, 0, 0, 10000)
+scroll.ScrollBarThickness = 6
+scroll.Parent = frame
+
+local output = Instance.new("TextLabel")
+output.Size = UDim2.new(1, -10, 0, 10000)
+output.Position = UDim2.new(0, 5, 0, 0)
+output.BackgroundTransparency = 1
+output.Text = "Нажми СКАНИРОВАТЬ ПЕРЧАТКИ"
+output.TextColor3 = Color3.fromRGB(180, 180, 180)
+output.Font = Enum.Font.SourceSans
+output.TextSize = 12
+output.TextXAlignment = Enum.TextXAlignment.Left
+output.TextYAlignment = Enum.TextYAlignment.Top
+output.TextWrapped = true
+output.Parent = scroll
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(0.9, 0, 0, 20)
+statusLabel.Position = UDim2.new(0.05, 0, 0, 423)
+statusLabel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+statusLabel.Text = "Перчатка: " .. getGlove() .. " | Слапы: " .. slapsBefore
+statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+statusLabel.Font = Enum.Font.SourceSans
+statusLabel.TextSize = 11
+statusLabel.Parent = frame
+
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0.45, 0, 0, 33)
+btn.Position = UDim2.new(0.05, 0, 0, 448)
+btn.BackgroundColor3 = Color3.fromRGB(30, 140, 30)
+btn.Text = "СКАНИРОВАТЬ"
+btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+btn.Font = Enum.Font.SourceSansBold
+btn.TextSize = 13
+btn.Parent = frame
+
+local copyBtn = Instance.new("TextButton")
+copyBtn.Size = UDim2.new(0.45, 0, 0, 33)
+copyBtn.Position = UDim2.new(0.5, 0, 0, 448)
+copyBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 140)
+copyBtn.Text = "КОПИРОВАТЬ"
+copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+copyBtn.Font = Enum.Font.SourceSansBold
+copyBtn.TextSize = 12
+copyBtn.Parent = frame
+
+btn.MouseButton1Click:Connect(function()
+    results = "=== УЯЗВИМОСТИ ЧЕРЕЗ ПЕРЧАТКИ ===\n\n"
+    results = results .. "Текущая перчатка: " .. getGlove() .. "\n"
+    results = results .. "Слапы до: " .. slapsBefore .. "\n\n"
+    workingGloves = {}
+    
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    
+    -- 1. Получение всех доступных перчаток
+    results = results .. "--- ДОСТУПНЫЕ ПЕРЧАТКИ ---\n"
+    
+    local gloveFunc = findFunction("CMDRGetGloveIDs")
+    if gloveFunc then
+        local success, gloves = pcall(function() return gloveFunc:InvokeServer() end)
+        if success and gloves then
+            results = results .. "Всего перчаток: " .. #gloves .. "\n"
+            if #gloves <= 50 then
+                for i, g in ipairs(gloves) do
+                    results = results .. "  " .. i .. ". " .. tostring(g) .. "\n"
+                end
+            else
+                results = results .. "(слишком много для вывода)\n"
+            end
+        end
+    end
+    
+    -- 2. Пробуем экипировать разные перчатки
+    results = results .. "\n--- ЭКИПИРОВКА ПЕРЧАТОК ---\n"
+    
+    local equipFuncs = {
+        "EquipGlove", "EquipEmote", "SetGloveMasteryEnabled",
+        "SpecialGloveAccess", "Framework_UseAbility"
+    }
+    
+    for _, funcName in ipairs(equipFuncs) do
+        local r = findRemote(funcName) or findFunction(funcName)
+        if r then
+            results = results .. funcName .. ": найден\n"
+            -- Пробуем экипировать Bounty, Default, и другие
+            local testGloves = {"Bounty", "Default", "bounty", "default", "1", 1, "God", "Admin"}
+            for _, glove in ipairs(testGloves) do
+                pcall(function()
+                    if r:IsA("RemoteFunction") then
+                        local res = r:InvokeServer(glove)
+                        results = results .. "  Invoke(" .. tostring(glove) .. ") = " .. tostring(res) .. "\n"
+                    else
+                        r:FireServer(glove)
+                        results = results .. "  FireServer(" .. tostring(glove) .. ")\n"
+                    end
+                end)
+            end
+        else
+            results = results .. funcName .. ": не найден\n"
+        end
+    end
+    
+    -- 3. Пробуем активировать способности перчаток
+    results = results .. "\n--- СПОСОБНОСТИ ПЕРЧАТОК ---\n"
+    
+    local abilityRemotes = {
+        "GeneralAbility", "UseAbility", "Framework_UseAbility",
+        "ClientUsedAbility", "RunMasteryAbility", "GlovelMasteryAbility",
+        "KillstreakSoulbankAbility", "DefenseMasteryAbility"
+    }
+    
+    for _, name in ipairs(abilityRemotes) do
+        local r = findRemote(name)
+        if r and hrp then
+            results = results .. name .. ": тестирую...\n"
+            local before = getSlaps()
+            
+            for i = 1, 3 do
+                pcall(function() r:FireServer(hrp) end)
+                task.wait(0.05)
+            end
+            
+            task.wait(0.2)
+            local after = getSlaps()
+            if after > before then
+                results = results .. "  ✅ ДАЛ СЛАПЫ! +" .. (after - before) .. "\n"
+                table.insert(workingGloves, name)
+            end
+        end
+    end
+    
+    -- 4. Пробуем получить перчатки через _NETWORK
+    results = results .. "\n--- NETWORK ФУНКЦИИ ---\n"
+    
+    for _, obj in pairs(ReplicatedStorage._NETWORK:GetDescendants()) do
+        if obj:IsA("RemoteFunction") then
+            local success, res = pcall(function() return obj:InvokeServer() end)
+            if success and res ~= nil then
+                local resStr = tostring(res)
+                if #resStr < 100 then
+                    results = results .. obj.Name .. ": " .. resStr .. "\n"
+                end
+            end
+        end
+    end
+    
+    -- 5. Прямая манипуляция с перчаткой в leaderstats
+    results = results .. "\n--- МАНИПУЛЯЦИЯ ПЕРЧАТКОЙ ---\n"
+    
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local gloveStat = ls:FindFirstChild("Glove")
+        if gloveStat then
+            local oldGlove = gloveStat.Value
+            -- Пробуем менять на разные перчатки
+            local testGloves = {"Overkill", "God", "Admin", "Custom", "Flex", "Default", "Bounty"}
+            for _, g in ipairs(testGloves) do
+                pcall(function() gloveStat.Value = g end)
+                task.wait(0.1)
+                local currentGlove = getGlove()
+                if currentGlove == g then
+                    results = results .. "✅ Можно сменить на: " .. g .. "\n"
+                    table.insert(workingGloves, "Смена на " .. g)
+                end
+            end
+            pcall(function() gloveStat.Value = oldGlove end)
+        end
+    end
+    
+    -- Итог
+    local slapsAfter = getSlaps()
+    results = results .. "\n=== ИТОГ ==="
+    results = results .. "\nСлапы: " .. slapsBefore .. " → " .. slapsAfter
+    if slapsAfter > slapsBefore then
+        results = results .. " (+" .. (slapsAfter - slapsBefore) .. ")"
+    end
+    results = results .. "\nНайдено уязвимостей: " .. #workingGloves
+    
+    output.Text = results
+    setclipboard(results)
+    statusLabel.Text = "Готово | Слапы: " .. slapsAfter
+end)
+
+copyBtn.MouseButton1Click:Connect(function()
+    setclipboard(results)
+    statusLabel.Text = "Скопировано!"
+end)
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+print("СКАНЕР ПЕРЧАТОК ГОТОВ")
+print("Нажми СКАНИРОВАТЬ")
+print("Проверит: список перчаток, экипировку, способности, смену перчатки")
