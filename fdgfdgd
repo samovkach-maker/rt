@@ -1,0 +1,209 @@
+-- ТЕСТ ABILITY ЭВЕНТОВ: GeneralAbility, UseAbility
+-- Встань рядом с игроком и жми кнопки
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local function getSlaps()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local slaps = ls:FindFirstChild("Slaps")
+        if slaps then return slaps.Value end
+    end
+    return 0
+end
+
+local lastSlaps = 0
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AbilityTest"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 300, 0, 310)
+Frame.Position = UDim2.new(0.5, -150, 0.2, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+Frame.BorderSizePixel = 1
+Frame.BorderColor3 = Color3.fromRGB(100, 100, 100)
+Frame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 28)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Title.Text = "ТЕСТ ABILITY + HIT"
+Title.TextColor3 = Color3.fromRGB(255, 200, 50)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 14
+Title.Parent = Frame
+
+local SlapsLabel = Instance.new("TextLabel")
+SlapsLabel.Size = UDim2.new(0.9, 0, 0, 25)
+SlapsLabel.Position = UDim2.new(0.05, 0, 0, 33)
+SlapsLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+SlapsLabel.Text = "Slaps: " .. getSlaps()
+SlapsLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+SlapsLabel.Font = Enum.Font.SourceSansBold
+SlapsLabel.TextSize = 13
+SlapsLabel.Parent = Frame
+
+local Result = Instance.new("TextLabel")
+Result.Size = UDim2.new(0.9, 0, 0, 20)
+Result.Position = UDim2.new(0.05, 0, 0, 60)
+Result.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Result.Text = ""
+Result.TextColor3 = Color3.fromRGB(200, 200, 200)
+Result.Font = Enum.Font.SourceSans
+Result.TextSize = 12
+Result.Parent = Frame
+
+-- Функция теста
+local function testRemote(name, path, argsList)
+    local remote = ReplicatedStorage:FindFirstChild(path)
+    if not remote then
+        -- Пробуем искать по всем Remotes
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        if remotes then
+            remote = remotes:FindFirstChild(path)
+        end
+    end
+    if not remote then
+        -- Ищем в Events
+        local events = ReplicatedStorage:FindFirstChild("Events")
+        if events then
+            remote = events:FindFirstChild(path)
+        end
+    end
+    if not remote then
+        -- Пробуем прямой поиск
+        for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+            if obj.Name == path and obj:IsA("RemoteEvent") then
+                remote = obj
+                break
+            end
+        end
+    end
+    
+    if not remote then
+        return "НЕ НАЙДЕН: " .. path
+    end
+    
+    local char = LocalPlayer.Character
+    if not char then return "Нет персонажа" end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return "Нет HRP" end
+    
+    -- Ищем цель
+    local target = nil
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local t = p.Character:FindFirstChild("HumanoidRootPart")
+            if t and (t.Position - hrp.Position).Magnitude < 30 then
+                target = t
+                break
+            end
+        end
+    end
+    if not target then target = hrp end
+    
+    -- Отправляем с разными аргументами
+    for _, args in ipairs(argsList) do
+        pcall(function()
+            remote:FireServer(unpack(args))
+        end)
+        task.wait(0.05)
+    end
+    
+    return "Вызван: " .. remote:GetFullName()
+end
+
+-- Кнопки
+local buttons = {
+    {"GeneralAbility", "GeneralAbility", {{hrp or LocalPlayer}}},
+    {"GeneralHit", "GeneralHit", {}},
+    {"Framework_UseAbility", "Framework_UseAbility", {{"Slap"}, {1}}},
+    {"UseAbility", "UseAbility", {{"Slap"}, {"Default"}}},
+}
+
+local y = 85
+for _, btnData in ipairs(buttons) do
+    local name = btnData[1]
+    local path = btnData[2]
+    
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 38)
+    btn.Position = UDim2.new(0.05, 0, 0, y)
+    btn.BackgroundColor3 = Color3.fromRGB(160, 90, 0)
+    btn.Text = "ТЕСТ " .. name
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 14
+    btn.Parent = Frame
+    
+    btn.MouseButton1Click:Connect(function()
+        lastSlaps = getSlaps()
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        
+        -- Обновляем аргументы
+        local argsList = {
+            {hrp or LocalPlayer},
+            {LocalPlayer},
+            {5},
+            {"Slap"},
+            {hrp and hrp.Position or Vector3.zero},
+        }
+        
+        local res = testRemote(name, path, argsList)
+        Result.Text = res
+        task.wait(0.3)
+        local newSlaps = getSlaps()
+        SlapsLabel.Text = "Slaps: " .. newSlaps .. " (было: " .. lastSlaps .. ")"
+        if newSlaps > lastSlaps then
+            Result.Text = "РАБОТАЕТ! +" .. (newSlaps - lastSlaps) .. " Slaps!"
+            Result.TextColor3 = Color3.fromRGB(100, 255, 100)
+        end
+    end)
+    
+    y = y + 43
+end
+
+-- Обновить
+local RefreshBtn = Instance.new("TextButton")
+RefreshBtn.Size = UDim2.new(0.9, 0, 0, 30)
+RefreshBtn.Position = UDim2.new(0.05, 0, 0, y + 5)
+RefreshBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+RefreshBtn.Text = "ОБНОВИТЬ SLAPS"
+RefreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+RefreshBtn.Font = Enum.Font.SourceSansBold
+RefreshBtn.TextSize = 13
+RefreshBtn.Parent = Frame
+
+RefreshBtn.MouseButton1Click:Connect(function()
+    SlapsLabel.Text = "Slaps: " .. getSlaps()
+end)
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = Frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+print("ТЕСТ ABILITY ГОТОВ")
+print("Нажми каждую кнопку по 5-10 раз")
+print("Если Slaps увеличатся - напиши какая кнопка")
