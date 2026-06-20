@@ -1,0 +1,164 @@
+-- ТОЧНЫЙ ТЕСТ ЛИМИТА: фармит пока не упрётся в потолок
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+
+local function find(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteEvent") then return obj end
+    end
+    return nil
+end
+
+local ga = find("GeneralAbility")
+local gh = find("GeneralHit")
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "LimitFinder"
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 250)
+frame.Position = UDim2.new(0.5, -150, 0.5, -125)
+frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+frame.BorderSizePixel = 1
+frame.BorderColor3 = Color3.fromRGB(100, 100, 100)
+frame.Parent = gui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 28)
+title.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+title.Text = "ПОИСК ЛИМИТА БАУНТИ"
+title.TextColor3 = Color3.fromRGB(255, 200, 50)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 13
+title.Parent = frame
+
+local info = Instance.new("TextLabel")
+info.Size = UDim2.new(0.9, 0, 0, 80)
+info.Position = UDim2.new(0.05, 0, 0, 35)
+info.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+info.Text = "Нажми СТАРТ\nФармит пока баунти не перестанет расти"
+info.TextColor3 = Color3.fromRGB(200, 200, 200)
+info.Font = Enum.Font.SourceSans
+info.TextSize = 13
+info.Parent = frame
+
+local status = Instance.new("TextLabel")
+status.Size = UDim2.new(0.9, 0, 0, 25)
+status.Position = UDim2.new(0.05, 0, 0, 120)
+status.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+status.Text = "Статус: Готов"
+status.TextColor3 = Color3.fromRGB(100, 255, 100)
+status.Font = Enum.Font.SourceSansBold
+status.TextSize = 12
+status.Parent = frame
+
+local counter = Instance.new("TextLabel")
+counter.Size = UDim2.new(0.9, 0, 0, 20)
+counter.Position = UDim2.new(0.05, 0, 0, 148)
+counter.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+counter.Text = "Ударов: 0 | Последний +: 0"
+counter.TextColor3 = Color3.fromRGB(200, 200, 200)
+counter.Font = Enum.Font.SourceSans
+counter.TextSize = 11
+counter.Parent = frame
+
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0.9, 0, 0, 35)
+btn.Position = UDim2.new(0.05, 0, 0, 173)
+btn.BackgroundColor3 = Color3.fromRGB(30, 140, 30)
+btn.Text = "СТАРТ"
+btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+btn.Font = Enum.Font.SourceSansBold
+btn.TextSize = 15
+btn.Parent = frame
+
+local farming = false
+local hits = 0
+local stuckCount = 0
+
+btn.MouseButton1Click:Connect(function()
+    if farming then
+        farming = false
+        btn.Text = "СТАРТ"
+        btn.BackgroundColor3 = Color3.fromRGB(30, 140, 30)
+        status.Text = "Статус: Остановлено"
+        return
+    end
+    
+    farming = true
+    hits = 0
+    stuckCount = 0
+    btn.Text = "СТОП"
+    btn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+    status.Text = "Статус: ФАРМ..."
+    status.TextColor3 = Color3.fromRGB(100, 255, 100)
+    
+    task.spawn(function()
+        while farming do
+            local char = LocalPlayer.Character
+            if not char then
+                status.Text = "Статус: Нет персонажа"
+                task.wait(1)
+                continue
+            end
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if not hrp then
+                status.Text = "Статус: Нет HRP"
+                task.wait(1)
+                continue
+            end
+            
+            -- 5 ударов
+            local gained = false
+            for i = 1, 5 do
+                if not farming then break end
+                if ga then pcall(function() ga:FireServer(hrp) end) end
+                task.wait(0.04)
+                if gh then pcall(function() gh:FireServer(hrp) end) end
+                task.wait(0.04)
+            end
+            
+            hits = hits + 5
+            counter.Text = "Ударов: " .. hits
+            
+            task.wait(0.3)
+            
+            -- Если долго фармим без остановки - всё ок
+            if hits % 50 == 0 then
+                status.Text = "Статус: ФАРМ (" .. hits .. " ударов)"
+            end
+            
+            -- После 500 ударов проверяем не пора ли остановить
+            if hits >= 500 then
+                status.Text = "Статус: 500+ ударов! Лимита нет или >500"
+                status.TextColor3 = Color3.fromRGB(100, 255, 100)
+            end
+        end
+    end)
+end)
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+print("ТЕСТ ЛИМИТА ГОТОВ")
+print("Нажми СТАРТ и смотри сколько ударов до остановки роста")
+print("Если дойдёт до 500+ без проблем - лимита нет")
