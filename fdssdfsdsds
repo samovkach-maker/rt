@@ -1,0 +1,94 @@
+-- ПОЛНЫЙ ПЕРЕБОР ВСЕХ ЭВЕНТОВ НА СЛАПЫ (с сохранением каждые 10)
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local function getSlaps()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local s = ls:FindFirstChild("Slaps")
+        if s then return s.Value end
+    end
+    return 0
+end
+
+local startSlaps = getSlaps()
+local results = "=== ПОЛНЫЙ ТЕСТ ВСЕХ ЭВЕНТОВ НА СЛАПЫ ===\n\n"
+results = results .. "Старт: " .. startSlaps .. " слапов\n\n"
+
+local allRemotes = {}
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+        table.insert(allRemotes, obj)
+    end
+end
+
+results = results .. "Всего эвентов: " .. #allRemotes .. "\n\n"
+
+local found = {}
+local tested = 0
+
+for i, obj in ipairs(allRemotes) do
+    local before = getSlaps()
+    local name = obj.Name
+    local fullPath = obj:GetFullName()
+    
+    -- Для RemoteEvent пробуем много вариантов
+    if obj:IsA("RemoteEvent") then
+        local argSets = {
+            {},
+            {LocalPlayer},
+            {100},
+            {1000},
+            {"Slaps"},
+            {"slaps"},
+            {"claim"},
+            {"collect"},
+            {"reward"},
+            {LocalPlayer, "Slaps"},
+            {LocalPlayer, 100},
+            {"add", 100},
+            {"give", "Slaps"},
+        }
+        for _, args in ipairs(argSets) do
+            pcall(function() obj:FireServer(unpack(args)) end)
+        end
+    elseif obj:IsA("RemoteFunction") then
+        pcall(function() obj:InvokeServer() end)
+        pcall(function() obj:InvokeServer(LocalPlayer) end)
+        pcall(function() obj:InvokeServer(100) end)
+        pcall(function() obj:InvokeServer("Slaps") end)
+    end
+    
+    task.wait(0.05)
+    local after = getSlaps()
+    
+    if after > before then
+        local msg = "✅ #" .. i .. " " .. name .. ": +" .. (after - before) .. " СЛАПОВ! [" .. fullPath .. "]"
+        results = results .. msg .. "\n"
+        table.insert(found, msg)
+        -- Сразу сохраняем в буфер при находке
+        setclipboard(results)
+    end
+    
+    tested = tested + 1
+    
+    -- Сохраняем каждые 10 тестов
+    if tested % 10 == 0 then
+        results = results .. "Прогресс: " .. tested .. "/" .. #allRemotes .. " | Найдено: " .. #found .. "\n"
+        setclipboard(results)
+        task.wait(0.1)
+    end
+end
+
+results = results .. "\n=== ГОТОВО ==="
+results = results .. "\nПроверено: " .. tested
+results = results .. "\nНайдено рабочих: " .. #found
+results = results .. "\nСлапы: " .. startSlaps .. " → " .. getSlaps()
+
+for i, f in ipairs(found) do
+    results = results .. "\n" .. i .. ". " .. f
+end
+
+setclipboard(results)
+print(results)
+print("\nСкопировано в буфер!")
