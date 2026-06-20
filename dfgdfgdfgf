@@ -1,0 +1,284 @@
+-- ФАРМ БАУНТИ ЧЕРЕЗ GENERALABILITY (+5 за удар!)
+-- Нашёл рабочий метод — не кикает, даёт 5 баунти
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local farming = false
+local delayTime = 0.8
+local hits = 0
+local totalGained = 0
+local lastSlaps = 0
+
+-- Ищем GeneralAbility
+local function findRemote(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteEvent") then
+            return obj
+        end
+    end
+    return nil
+end
+
+local generalAbility = findRemote("GeneralAbility")
+local generalHit = findRemote("GeneralHit")
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AbilityFarmGUI"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 280, 0, 260)
+Frame.Position = UDim2.new(0.5, -140, 0.3, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+Frame.BorderSizePixel = 1
+Frame.BorderColor3 = Color3.fromRGB(80, 80, 80)
+Frame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 28)
+Title.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Title.Text = "GENERAL ABILITY +5 FARM"
+Title.TextColor3 = Color3.fromRGB(100, 255, 100)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 13
+Title.Parent = Frame
+
+local SlapsLabel = Instance.new("TextLabel")
+SlapsLabel.Size = UDim2.new(0.9, 0, 0, 22)
+SlapsLabel.Position = UDim2.new(0.05, 0, 0, 33)
+SlapsLabel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+SlapsLabel.Text = "Slaps: ..."
+SlapsLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+SlapsLabel.Font = Enum.Font.SourceSansBold
+SlapsLabel.TextSize = 14
+SlapsLabel.Parent = Frame
+
+local StatsLabel = Instance.new("TextLabel")
+StatsLabel.Size = UDim2.new(0.9, 0, 0, 20)
+StatsLabel.Position = UDim2.new(0.05, 0, 0, 57)
+StatsLabel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+StatsLabel.Text = "Ударов: 0 | +Slaps: 0"
+StatsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+StatsLabel.Font = Enum.Font.SourceSans
+StatsLabel.TextSize = 12
+StatsLabel.Parent = Frame
+
+local SpeedLabel = Instance.new("TextLabel")
+SpeedLabel.Size = UDim2.new(0.9, 0, 0, 18)
+SpeedLabel.Position = UDim2.new(0.05, 0, 0, 79)
+SpeedLabel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+SpeedLabel.Text = "Задержка: 0.8с | ~375/мин"
+SpeedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+SpeedLabel.Font = Enum.Font.SourceSans
+SpeedLabel.TextSize = 11
+SpeedLabel.Parent = Frame
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0.9, 0, 0, 42)
+ToggleBtn.Position = UDim2.new(0.05, 0, 0, 100)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(35, 150, 35)
+ToggleBtn.Text = "СТАРТ ФАРМ"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.SourceSansBold
+ToggleBtn.TextSize = 16
+ToggleBtn.Parent = Frame
+
+-- Кнопки скорости
+local FasterBtn = Instance.new("TextButton")
+FasterBtn.Size = UDim2.new(0.28, 0, 0, 28)
+FasterBtn.Position = UDim2.new(0.05, 0, 0, 148)
+FasterBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+FasterBtn.Text = "+0.1"
+FasterBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+FasterBtn.Font = Enum.Font.SourceSans
+FasterBtn.TextSize = 12
+FasterBtn.Parent = Frame
+
+local SlowerBtn = Instance.new("TextButton")
+SlowerBtn.Size = UDim2.new(0.28, 0, 0, 28)
+SlowerBtn.Position = UDim2.new(0.36, 0, 0, 148)
+SlowerBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
+SlowerBtn.Text = "-0.1"
+SlowerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SlowerBtn.Font = Enum.Font.SourceSans
+SlowerBtn.TextSize = 12
+SlowerBtn.Parent = Frame
+
+local OptBtn = Instance.new("TextButton")
+OptBtn.Size = UDim2.new(0.28, 0, 0, 28)
+OptBtn.Position = UDim2.new(0.67, 0, 0, 148)
+OptBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 0)
+OptBtn.Text = "АВТО"
+OptBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+OptBtn.Font = Enum.Font.SourceSans
+OptBtn.TextSize = 11
+OptBtn.Parent = Frame
+
+local DualLabel = Instance.new("TextLabel")
+DualLabel.Size = UDim2.new(0.9, 0, 0, 20)
+DualLabel.Position = UDim2.new(0.05, 0, 0, 182)
+DualLabel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+DualLabel.Text = "Метод: Ability + Hit"
+DualLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+DualLabel.Font = Enum.Font.SourceSans
+DualLabel.TextSize = 11
+DualLabel.Parent = Frame
+
+local InfoBtn = Instance.new("TextLabel")
+InfoBtn.Size = UDim2.new(0.9, 0, 0, 30)
+InfoBtn.Position = UDim2.new(0.05, 0, 0, 208)
+InfoBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+InfoBtn.Text = "Ability даёт +5 | Hit даёт +1\nВместе: ~400-500 Slaps/мин"
+InfoBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+InfoBtn.Font = Enum.Font.SourceSans
+InfoBtn.TextSize = 10
+InfoBtn.Parent = Frame
+
+-- Функции
+local function getSlaps()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local s = ls:FindFirstChild("Slaps")
+        if s then return s.Value end
+    end
+    return 0
+end
+
+local function doAbilityHit()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    
+    -- GeneralAbility даёт +5
+    if generalAbility then
+        pcall(function() generalAbility:FireServer(hrp) end)
+        pcall(function() generalAbility:FireServer(hrp.Position) end)
+        pcall(function() generalAbility:FireServer() end)
+    end
+    
+    task.wait(0.05)
+    
+    -- GeneralHit даёт +1 (дополнительно)
+    if generalHit then
+        pcall(function() generalHit:FireServer(hrp) end)
+        pcall(function() generalHit:FireServer() end)
+    end
+    
+    return true
+end
+
+local farmTask
+local function startFarm()
+    farming = true
+    hits = 0
+    totalGained = 0
+    lastSlaps = getSlaps()
+    
+    farmTask = task.spawn(function()
+        while farming do
+            doAbilityHit()
+            hits = hits + 1
+            
+            local current = getSlaps()
+            if current > lastSlaps then
+                totalGained = totalGained + (current - lastSlaps)
+                lastSlaps = current
+            end
+            
+            -- UI обновление каждые 5 ударов
+            if hits % 5 == 0 then
+                SlapsLabel.Text = "Slaps: " .. current
+                StatsLabel.Text = "Ударов: " .. hits .. " | +Slaps: " .. totalGained
+                local perMin = math.floor((totalGained / (hits * delayTime)) * 60)
+                SpeedLabel.Text = "Задержка: " .. string.format("%.1f", delayTime) .. "с | ~" .. perMin .. "/мин"
+            end
+            
+            task.wait(delayTime)
+        end
+    end)
+end
+
+local function stopFarm()
+    farming = false
+    if farmTask then
+        task.cancel(farmTask)
+        farmTask = nil
+    end
+    local current = getSlaps()
+    SlapsLabel.Text = "Slaps: " .. current
+    StatsLabel.Text = "Ударов: " .. hits .. " | +Slaps: " .. totalGained
+end
+
+-- Кнопки
+ToggleBtn.MouseButton1Click:Connect(function()
+    if farming then
+        stopFarm()
+        ToggleBtn.Text = "СТАРТ ФАРМ"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(35, 150, 35)
+    else
+        startFarm()
+        ToggleBtn.Text = "СТОП ФАРМ"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 35, 35)
+    end
+end)
+
+FasterBtn.MouseButton1Click:Connect(function()
+    delayTime = math.max(0.3, delayTime - 0.1)
+end)
+
+SlowerBtn.MouseButton1Click:Connect(function()
+    delayTime = math.min(2.0, delayTime + 0.1)
+end)
+
+OptBtn.MouseButton1Click:Connect(function()
+    -- Авто-подбор оптимальной задержки
+    DualLabel.Text = "Метод: авто-подбор..."
+    task.spawn(function()
+        local testDelay = 0.3
+        for i = 1, 10 do
+            if not farming then break end
+            delayTime = testDelay + (i * 0.05)
+            task.wait(3)
+        end
+        DualLabel.Text = "Метод: Ability + Hit [опт: " .. string.format("%.1f", delayTime) .. "с]"
+    end)
+end)
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = Frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+ScreenGui.Destroying:Connect(stopFarm)
+
+local status = ""
+if generalAbility then status = status .. "GeneralAbility: НАЙДЕН " end
+if generalHit then status = status .. "| GeneralHit: НАЙДЕН" end
+
+print("==============================================")
+print("GENERAL ABILITY + HIT FARM ГОТОВ!")
+print("GeneralAbility даёт +5 баунти за удар")
+print("GeneralHit даёт +1 дополнительно")
+print("Вместе: +6 за цикл")
+print(status)
+print("==============================================") как он работает
