@@ -1,97 +1,203 @@
--- ПЕРЕБОР ВСЕХ HIT ЭВЕНТОВ: Ищем рабочий для фарма баунти
--- Спамит каждый Hit эвент по 2 секунды и переходит к следующему
+-- СУПЕР-ДИАГНОСТИКА: Перехват клика мыши и всего что за ним следует
+-- Запусти, нажми ЗАПИСЬ, кликни левой кнопкой для удара печаткой 1 раз, жди 2 сек
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
+local GuiService = game:GetService("GuiService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
--- Все Hit эвенты из списка который мы получили
-local hitEventsList = {
-    "DiamondHit", "GhostHit", "SnowHit", "FlashHit", "GoldenHit", 
-    "BombHit", "ReaperHit", "IceHit", "PusherHit", "BrickHit",
-    "KSHit", "MittenHit", "BubbleHit", "ReHit", "SlappleHit",
-    "GeneralHit", "CustomHit", "RetributionHit", "HitmanHit",
-    "ThorHit", "CloudHit", "NimbusHit", "NullHit", "CoolerDefaultHit",
-    "BullHit", "FlexHit", "BrazilHit", "DiceHit", "ReplicaHit",
-    "DefenseHit", "DominanceHit", "ReverseHit", "ShukuchiHit",
-    "DuelistHit", "BoomerangH", "DisarmH", "Orbihit", "LinkHit",
-    "MisterHit", "RetroHit", "PlagueHit", "PylonHit", "TinkererHit",
-    "LeafblowerHit", "UTGHit", "DualHit", "PhaseH", "AcHit",
-    "MagnetHIT", "Errorhit", "PullHit", "Adios", "Anchor", "hitbus"
-}
+local logData = ""
+local recording = false
+local startTime = 0
+
+local function log(cat, msg)
+    local t = string.format("%.4f", tick() - startTime)
+    local entry = "[" .. t .. "][" .. cat .. "] " .. tostring(msg)
+    logData = logData .. entry .. "\n"
+    if #logData > 100000 then
+        logData = string.sub(logData, 1, 100000) .. "\n[ОБРЕЗАНО]"
+    end
+end
+
+-- 1. Перехватываем все InputBegan на всех объектах
+local function hookAllInputs()
+    -- UserInputService
+    local uisConns = getconnections(UserInputService.InputBegan)
+    for i, conn in ipairs(uisConns) do
+        log("UIS.InputBegan", "Найдено соединение #" .. i)
+        pcall(function()
+            local func = conn.Function
+            if func then
+                local info = debug.getinfo(func, "nS")
+                log("UIS.InputBegan.Func", "Имя: " .. (info.name or "?") .. " | Источник: " .. (info.short_src or "?"))
+            end
+        end)
+    end
+    
+    -- GuiService
+    local guiConns = getconnections(GuiService.TouchMoved)
+    -- Пропускаем, фокус на InputBegan
+    
+    -- Все кнопки в PlayerGui
+    for _, obj in pairs(LocalPlayer.PlayerGui:GetDescendants()) do
+        if obj:IsA("TextButton") or obj:IsA("ImageButton") or obj:IsA("GuiButton") then
+            local conns = getconnections(obj.MouseButton1Click)
+            if #conns > 0 then
+                log("GUI.Button", obj:GetFullName() .. " имеет " .. #conns .. " соединений")
+                for i, conn in ipairs(conns) do
+                    pcall(function()
+                        local func = conn.Function
+                        if func then
+                            local info = debug.getinfo(func, "nS")
+                            log("GUI.Button.Func", obj.Name .. " #" .. i .. " -> " .. (info.name or "?") .. " @ " .. (info.short_src or "?"))
+                        end
+                    end)
+                end
+            end
+        end
+    end
+    
+    -- ContextActionService
+    local boundActions = ContextActionService:GetAllBoundActionInfo()
+    for action, info in pairs(boundActions) do
+        log("ContextAction", action .. " привязан")
+    end
+end
+
+-- 2. Перехват FireServer и InvokeServer с полным стеком вызовов
+local mt = getrawmetatable(game)
+local oldNamecall = mt.__namecall
+setreadonly(mt, false)
+mt.__namecall = function(self, ...)
+    local method = getnamecallmethod()
+    
+    if (method == "FireServer" or method == "InvokeServer") and recording then
+        local remotePath = "?"
+        pcall(function() remotePath = self:GetFullName() end)
+        
+        local argStr = ""
+        for i = 1, select("#", ...) do
+            local arg = select(i, ...)
+            local valStr
+            if arg == nil then valStr = "nil"
+            elseif type(arg) == "string" then valStr = '"' .. arg .. '"'
+            elseif type(arg) == "number" then valStr = tostring(arg)
+            elseif type(arg) == "boolean" then valStr = arg and "true" or "false"
+            elseif typeof(arg) == "Vector3" then valStr = string.format("V3(%.1f,%.1f,%.1f)", arg.X, arg.Y, arg.Z)
+            elseif typeof(arg) == "CFrame" then valStr = string.format("CF(%.1f,%.1f,%.1f)", arg.Position.X, arg.Position.Y, arg.Position.Z)
+            elseif typeof(arg) == "Instance" then valStr = arg.ClassName .. ":" .. arg.Name
+            elseif type(arg) == "table" then
+                local c = 0; pcall(function() for _, _ in pairs(arg) do c = c + 1; if c > 5 then break end end end)
+                valStr = "Table[" .. c .. "]"
+            else valStr = tostring(arg) .. "<" .. typeof(arg) .. ">"
+            end
+            argStr = argStr .. "[" .. i .. "]=" .. valStr .. " "
+        end
+        
+        log(method, remotePath .. " | " .. argStr)
+        
+        -- Снимаем стек вызовов
+        local trace = debug.traceback("", 2)
+        log("STACK", "\n" .. trace)
+    end
+    
+    return oldNamecall(self, ...)
+end
+setreadonly(mt, true)
+
+-- 3. Перехват OnClientEvent
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj:IsA("RemoteEvent") then
+        obj.OnClientEvent:Connect(function(...)
+            if not recording then return end
+            local args = {...}
+            if #args > 0 then
+                local argStr = ""
+                for i = 1, math.min(#args, 3) do
+                    argStr = argStr .. "[" .. i .. "]=" .. tostring(args[i]) .. " "
+                end
+                log("OnClientEvent", obj.Name .. " | " .. argStr)
+            end
+        end)
+    end
+end
+
+-- 4. Мониторинг Tool (печатка)
+LocalPlayer.CharacterAdded:Connect(function(char)
+    wait(0.5)
+    for _, obj in pairs(char:GetDescendants()) do
+        if obj:IsA("Tool") then
+            log("CHAR.Tool", "Найдена печатка: " .. obj.Name)
+            obj.Activated:Connect(function()
+                if recording then
+                    log("TOOL.Activated", obj.Name .. " АКТИВИРОВАНА!")
+                end
+            end)
+            obj.Equipped:Connect(function()
+                log("TOOL.Equipped", obj.Name .. " экипирована")
+            end)
+        end
+    end
+end)
+
+-- Инициализация
+hookAllInputs()
 
 -- GUI
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "HitFinderGUI"
+ScreenGui.Name = "UltraDiagGUI"
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 ScreenGui.ResetOnSpawn = false
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 300, 0, 220)
-Frame.Position = UDim2.new(0.5, -150, 0.25, 0)
-Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Frame.Size = UDim2.new(0, 320, 0, 150)
+Frame.Position = UDim2.new(0.5, -160, 0.1, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 Frame.BorderSizePixel = 1
-Frame.BorderColor3 = Color3.fromRGB(80, 80, 80)
+Frame.BorderColor3 = Color3.fromRGB(100, 100, 100)
 Frame.Parent = ScreenGui
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 30)
-Title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-Title.Text = "HIT EVENT FINDER"
-Title.TextColor3 = Color3.fromRGB(255, 200, 50)
+Title.Size = UDim2.new(1, 0, 0, 28)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Title.Text = "УЛЬТРА-ДИАГНОСТИКА КЛИКА"
+Title.TextColor3 = Color3.fromRGB(255, 180, 50)
 Title.Font = Enum.Font.SourceSansBold
-Title.TextSize = 16
+Title.TextSize = 14
 Title.Parent = Frame
 
-local CurrentLabel = Instance.new("TextLabel")
-CurrentLabel.Size = UDim2.new(0.9, 0, 0, 25)
-CurrentLabel.Position = UDim2.new(0.05, 0, 0, 40)
-CurrentLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-CurrentLabel.Text = "Текущий: Нет"
-CurrentLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-CurrentLabel.Font = Enum.Font.SourceSans
-CurrentLabel.TextSize = 13
-CurrentLabel.Parent = Frame
+local Status = Instance.new("TextLabel")
+Status.Size = UDim2.new(0.9, 0, 0, 25)
+Status.Position = UDim2.new(0.05, 0, 0, 35)
+Status.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Status.Text = "Готов"
+Status.TextColor3 = Color3.fromRGB(200, 200, 200)
+Status.Font = Enum.Font.SourceSans
+Status.TextSize = 12
+Status.Parent = Frame
 
-local ProgressLabel = Instance.new("TextLabel")
-ProgressLabel.Size = UDim2.new(0.9, 0, 0, 25)
-ProgressLabel.Position = UDim2.new(0.05, 0, 0, 70)
-ProgressLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-ProgressLabel.Text = "Прогресс: 0/" .. #hitEventsList
-ProgressLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-ProgressLabel.Font = Enum.Font.SourceSans
-ProgressLabel.TextSize = 12
-ProgressLabel.Parent = Frame
+local RecordBtn = Instance.new("TextButton")
+RecordBtn.Size = UDim2.new(0.9, 0, 0, 45)
+RecordBtn.Position = UDim2.new(0.05, 0, 0, 65)
+RecordBtn.BackgroundColor3 = Color3.fromRGB(180, 80, 0)
+RecordBtn.Text = "НАЧАТЬ ЗАПИСЬ И УДАРИТЬ"
+RecordBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+RecordBtn.Font = Enum.Font.SourceSansBold
+RecordBtn.TextSize = 15
+RecordBtn.Parent = Frame
 
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(0.9, 0, 0, 25)
-StatusLabel.Position = UDim2.new(0.05, 0, 0, 100)
-StatusLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-StatusLabel.Text = "Готов"
-StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-StatusLabel.Font = Enum.Font.SourceSans
-StatusLabel.TextSize = 12
-StatusLabel.Parent = Frame
-
-local StartButton = Instance.new("TextButton")
-StartButton.Size = UDim2.new(0.9, 0, 0, 40)
-StartButton.Position = UDim2.new(0.05, 0, 0, 135)
-StartButton.BackgroundColor3 = Color3.fromRGB(50, 160, 50)
-StartButton.Text = "СТАРТ ПЕРЕБОР"
-StartButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-StartButton.Font = Enum.Font.SourceSansBold
-StartButton.TextSize = 16
-StartButton.Parent = Frame
-
-local StopButton = Instance.new("TextButton")
-StopButton.Size = UDim2.new(0.9, 0, 0, 35)
-StopButton.Position = UDim2.new(0.05, 0, 0, 180)
-StopButton.BackgroundColor3 = Color3.fromRGB(160, 40, 40)
-StopButton.Text = "СТОП"
-StopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-StopButton.Font = Enum.Font.SourceSansBold
-StopButton.TextSize = 14
-StopButton.Parent = Frame
+local Info = Instance.new("TextLabel")
+Info.Size = UDim2.new(0.9, 0, 0, 25)
+Info.Position = UDim2.new(0.05, 0, 0, 115)
+Info.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Info.Text = "После записи Ctrl+V в блокнот"
+Info.TextColor3 = Color3.fromRGB(150, 150, 150)
+Info.Font = Enum.Font.SourceSans
+Info.TextSize = 11
+Info.Parent = Frame
 
 -- Перетаскивание
 local UIS = game:GetService("UserInputService")
@@ -115,94 +221,30 @@ UIS.InputEnded:Connect(function(input)
     end
 end)
 
--- Перебор
-local running = false
-local testConnection
-
-local function testHitEvent(hitName)
-    local hitEvent = ReplicatedStorage:FindFirstChild(hitName)
-    if not hitEvent then
-        return false
-    end
-    if not hitEvent:IsA("RemoteEvent") then
-        return false
-    end
+RecordBtn.MouseButton1Click:Connect(function()
+    logData = ""
+    recording = true
+    startTime = tick()
+    log("SYSTEM", "=== УЛЬТРА-ДИАГНОСТИКА НАЧАЛАСЬ ===")
+    log("SYSTEM", "КЛИКНИ ЛЕВОЙ КНОПКОЙ МЫШИ ДЛЯ УДАРА ПЕЧАТКОЙ!")
+    Status.Text = "ЗАПИСЬ! КЛИКНИ ДЛЯ УДАРА!"
+    RecordBtn.BackgroundColor3 = Color3.fromRGB(200, 30, 30)
+    RecordBtn.Text = "ИДЁТ ЗАПИСЬ... КЛИКАЙ!"
     
-    local char = LocalPlayer.Character
-    if not char then return false end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
-    
-    -- Пробуем разные аргументы
-    pcall(function() hitEvent:FireServer(hrp.Position) end)
-    pcall(function() hitEvent:FireServer(hrp) end)
-    pcall(function() hitEvent:FireServer(LocalPlayer) end)
-    pcall(function() hitEvent:FireServer(hrp.Position, 5) end)
-    pcall(function() hitEvent:FireServer(5) end)
-    
-    return true
-end
-
-local function startTesting()
-    running = true
-    local index = 1
-    
-    testConnection = game:GetService("RunService").Heartbeat:Connect(function()
-        -- Не делаем здесь, используем task.spawn
-    end)
-    
-    task.spawn(function()
-        while running and index <= #hitEventsList do
-            local hitName = hitEventsList[index]
-            CurrentLabel.Text = "Текущий: " .. hitName
-            ProgressLabel.Text = "Прогресс: " .. index .. "/" .. #hitEventsList
-            StatusLabel.Text = "Тестирую " .. hitName .. "... СЛЕДИ ЗА БАУНТИ!"
-            StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
-            
-            -- Спамим этот эвент 2 секунды (10 раз с задержкой 0.2)
-            for i = 1, 10 do
-                if not running then break end
-                local found = testHitEvent(hitName)
-                if found then
-                    StatusLabel.Text = "Спамлю " .. hitName .. " [" .. i .. "/10]"
-                end
-                task.wait(0.2)
-            end
-            
-            index = index + 1
-        end
-        
-        if index > #hitEventsList then
-            StatusLabel.Text = "ПЕРЕБОР ЗАВЕРШЁН! Проверь баунти"
-            StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-            CurrentLabel.Text = "Текущий: ЗАВЕРШЕНО"
-            ProgressLabel.Text = "Прогресс: " .. #hitEventsList .. "/" .. #hitEventsList
+    task.delay(2.5, function()
+        if recording then
+            recording = false
+            log("SYSTEM", "=== ЗАПИСЬ ОСТАНОВЛЕНА ===")
+            setclipboard(logData)
+            Status.Text = "ГОТОВО! Ctrl+V"
+            RecordBtn.BackgroundColor3 = Color3.fromRGB(180, 80, 0)
+            RecordBtn.Text = "НАЧАТЬ ЗАПИСЬ И УДАРИТЬ"
+            print("========== УЛЬТРА-ДИАГНОСТИКА ==========")
+            print(logData)
+            print("========== КОНЕЦ ==========")
         end
     end)
-end
-
-local function stopTesting()
-    running = false
-    if testConnection then
-        testConnection:Disconnect()
-        testConnection = nil
-    end
-    StatusLabel.Text = "Остановлено"
-    StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-    CurrentLabel.Text = "Текущий: СТОП"
-end
-
-StartButton.MouseButton1Click:Connect(function()
-    if not running then
-        startTesting()
-    end
 end)
 
-StopButton.MouseButton1Click:Connect(function()
-    stopTesting()
-end)
-
-print("HIT EVENT FINDER ГОТОВ")
-print("Нажми СТАРТ и следи за баунти")
-print("Когда увидишь что баунти начал расти - напиши какой эвент был Текущим")
-print("Затем нажми СТОП")
+print("УЛЬТРА-ДИАГНОСТИКА ГОТОВА")
+print("Нажми кнопку, кликни мышкой для удара, жди 2.5 сек, Ctrl+V")
