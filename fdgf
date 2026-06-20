@@ -1,0 +1,203 @@
+-- ФАРМ ЧЕРЕЗ ФИЗИКУ: Быстрый телепорт для симуляции удара
+-- Находись рядом с другими игроками и запускай
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local farming = false
+local delayTime = 0.3
+local hits = 0
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "PhysicsFarmGUI"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 260, 0, 200)
+Frame.Position = UDim2.new(0.5, -130, 0.3, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Frame.BorderSizePixel = 1
+Frame.BorderColor3 = Color3.fromRGB(80, 80, 80)
+Frame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 28)
+Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Title.Text = "PHYSICS HIT FARM"
+Title.TextColor3 = Color3.fromRGB(255, 180, 50)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 14
+Title.Parent = Frame
+
+local Info = Instance.new("TextLabel")
+Info.Size = UDim2.new(0.9, 0, 0, 25)
+Info.Position = UDim2.new(0.05, 0, 0, 35)
+Info.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Info.Text = "Найди игрока и стой рядом с ним"
+Info.TextColor3 = Color3.fromRGB(200, 200, 200)
+Info.Font = Enum.Font.SourceSans
+Info.TextSize = 12
+Info.Parent = Frame
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0.9, 0, 0, 42)
+ToggleBtn.Position = UDim2.new(0.05, 0, 0, 65)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 150, 40)
+ToggleBtn.Text = "СТАРТ ФАРМ"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.SourceSansBold
+ToggleBtn.TextSize = 16
+ToggleBtn.Parent = Frame
+
+local SpeedLabel = Instance.new("TextLabel")
+SpeedLabel.Size = UDim2.new(0.9, 0, 0, 20)
+SpeedLabel.Position = UDim2.new(0.05, 0, 0, 115)
+SpeedLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+SpeedLabel.Text = "Задержка: 0.3с | Ударов: 0"
+SpeedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+SpeedLabel.Font = Enum.Font.SourceSans
+SpeedLabel.TextSize = 12
+SpeedLabel.Parent = Frame
+
+local FasterBtn = Instance.new("TextButton")
+FasterBtn.Size = UDim2.new(0.42, 0, 0, 28)
+FasterBtn.Position = UDim2.new(0.05, 0, 0, 140)
+FasterBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+FasterBtn.Text = "+ БЫСТРЕЕ"
+FasterBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+FasterBtn.Font = Enum.Font.SourceSans
+FasterBtn.TextSize = 12
+FasterBtn.Parent = Frame
+
+local SlowerBtn = Instance.new("TextButton")
+SlowerBtn.Size = UDim2.new(0.42, 0, 0, 28)
+SlowerBtn.Position = UDim2.new(0.52, 0, 0, 140)
+SlowerBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
+SlowerBtn.Text = "- МЕДЛЕННЕЕ"
+SlowerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SlowerBtn.Font = Enum.Font.SourceSans
+SlowerBtn.TextSize = 12
+SlowerBtn.Parent = Frame
+
+local MethodLabel = Instance.new("TextLabel")
+MethodLabel.Size = UDim2.new(0.9, 0, 0, 20)
+MethodLabel.Position = UDim2.new(0.05, 0, 0, 173)
+MethodLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MethodLabel.Text = "Метод: телепорт к цели"
+MethodLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+MethodLabel.Font = Enum.Font.SourceSans
+MethodLabel.TextSize = 11
+MethodLabel.Parent = Frame
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = Frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+-- Функция фарма
+local function doHit()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    
+    -- Ищем ближайшего игрока
+    local target = nil
+    local minDist = 20 -- максимум 20 studs
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local targetHrp = player.Character:FindFirstChild("HumanoidRootPart")
+            if targetHrp then
+                local dist = (hrp.Position - targetHrp.Position).Magnitude
+                if dist < minDist then
+                    minDist = dist
+                    target = targetHrp
+                end
+            end
+        end
+    end
+    
+    if not target then return false end
+    
+    local myPos = hrp.CFrame
+    local targetPos = target.CFrame
+    
+    -- Телепорт в цель (внутрь)
+    hrp.CFrame = targetPos * CFrame.new(0, 0, -1.5)
+    
+    -- Задержка для физического контакта
+    task.wait(0.05)
+    
+    -- Телепорт обратно
+    hrp.CFrame = myPos
+    
+    return true
+end
+
+-- Цикл фарма
+local farmTask
+local function startFarm()
+    farming = true
+    farmTask = task.spawn(function()
+        while farming do
+            local success = doHit()
+            if success then
+                hits = hits + 1
+                SpeedLabel.Text = "Задержка: " .. string.format("%.1f", delayTime) .. "с | Ударов: " .. hits
+            end
+            task.wait(delayTime)
+        end
+    end)
+end
+
+local function stopFarm()
+    farming = false
+    if farmTask then
+        task.cancel(farmTask)
+        farmTask = nil
+    end
+end
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    if farming then
+        stopFarm()
+        ToggleBtn.Text = "СТАРТ ФАРМ"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 150, 40)
+    else
+        startFarm()
+        ToggleBtn.Text = "СТОП ФАРМ"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+    end
+end)
+
+FasterBtn.MouseButton1Click:Connect(function()
+    delayTime = math.max(0.05, delayTime - 0.05)
+    SpeedLabel.Text = "Задержка: " .. string.format("%.2f", delayTime) .. "с | Ударов: " .. hits
+end)
+
+SlowerBtn.MouseButton1Click:Connect(function()
+    delayTime = math.min(1.0, delayTime + 0.05)
+    SpeedLabel.Text = "Задержка: " .. string.format("%.2f", delayTime) .. "с | Ударов: " .. hits
+end)
+
+print("PHYSICS FARM ГОТОВ")
+print("Найди другого игрока, встань рядом, нажми СТАРТ")
+print("Скрипт телепортирует тебя в игрока и обратно для симуляции удара")
