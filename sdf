@@ -1,0 +1,234 @@
+-- ФАРМ БАУНТИ ЧЕРЕЗ HIT (МЕДЛЕННЫЙ НО РАБОЧИЙ)
+-- Спамит Hit эвенты с задержкой для обхода замедления
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+
+-- Создаём GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "BountyHitFarm"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 250, 0, 180)
+Frame.Position = UDim2.new(0.5, -125, 0.3, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Frame.BorderSizePixel = 0
+Frame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Title.Text = "BOUNTY FARM (Hit Method)"
+Title.TextColor3 = Color3.fromRGB(255, 200, 50)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 14
+Title.Parent = Frame
+
+local Toggle = Instance.new("TextButton")
+Toggle.Name = "ToggleButton"
+Toggle.Size = UDim2.new(0.9, 0, 0, 45)
+Toggle.Position = UDim2.new(0.05, 0, 0, 40)
+Toggle.BackgroundColor3 = Color3.fromRGB(50, 170, 50)
+Toggle.Text = "СТАРТ ФАРМ"
+Toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+Toggle.Font = Enum.Font.SourceSansBold
+Toggle.TextSize = 18
+Toggle.Parent = Frame
+
+local SpeedLabel = Instance.new("TextLabel")
+SpeedLabel.Size = UDim2.new(0.9, 0, 0, 20)
+SpeedLabel.Position = UDim2.new(0.05, 0, 0, 95)
+SpeedLabel.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+SpeedLabel.Text = "Задержка: 0.5 сек (двигай слайдер)"
+SpeedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+SpeedLabel.Font = Enum.Font.SourceSans
+SpeedLabel.TextSize = 12
+SpeedLabel.Parent = Frame
+
+-- Слайдер задержки (грубый, через кнопки)
+local Faster = Instance.new("TextButton")
+Faster.Size = UDim2.new(0.28, 0, 0, 25)
+Faster.Position = UDim2.new(0.05, 0, 0, 120)
+Faster.BackgroundColor3 = Color3.fromRGB(0, 120, 0)
+Faster.Text = "БЫСТРЕЕ"
+Faster.TextColor3 = Color3.fromRGB(255, 255, 255)
+Faster.Font = Enum.Font.SourceSans
+Faster.TextSize = 12
+Faster.Parent = Frame
+
+local Slower = Instance.new("TextButton")
+Slower.Size = UDim2.new(0.28, 0, 0, 25)
+Slower.Position = UDim2.new(0.37, 0, 0, 120)
+Slower.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+Slower.Text = "МЕДЛЕННЕЕ"
+Slower.TextColor3 = Color3.fromRGB(255, 255, 255)
+Slower.Font = Enum.Font.SourceSans
+Slower.TextSize = 12
+Slower.Parent = Frame
+
+local CountLabel = Instance.new("TextLabel")
+CountLabel.Size = UDim2.new(0.28, 0, 0, 25)
+CountLabel.Position = UDim2.new(0.68, 0, 0, 120)
+CountLabel.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+CountLabel.Text = "Скорость: 0.5с"
+CountLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+CountLabel.Font = Enum.Font.SourceSans
+CountLabel.TextSize = 11
+CountLabel.Parent = Frame
+
+local HitCount = Instance.new("TextLabel")
+HitCount.Size = UDim2.new(0.9, 0, 0, 20)
+HitCount.Position = UDim2.new(0.05, 0, 0, 150)
+HitCount.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+HitCount.Text = "Ударов: 0"
+HitCount.TextColor3 = Color3.fromRGB(200, 200, 200)
+HitCount.Font = Enum.Font.SourceSans
+HitCount.TextSize = 12
+HitCount.Parent = Frame
+
+-- Переменные
+local farming = false
+local delayTime = 0.5
+local hits = 0
+
+-- Функция отправки Hit
+local function sendHit()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    
+    -- Метод 1: Прямой b эвент
+    local bEvent = ReplicatedStorage:FindFirstChild("b")
+    if bEvent and bEvent:IsA("RemoteEvent") then
+        pcall(function()
+            bEvent:FireServer(hrp.Position, hrp)
+        end)
+    end
+    
+    -- Метод 2: Framework_OnHit
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    if remotes then
+        local onHit = remotes:FindFirstChild("Framework_OnHit")
+        if onHit and onHit:IsA("RemoteEvent") then
+            pcall(function()
+                -- Цель - любой ближайший игрок или я сам
+                local target = hrp
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player ~= LocalPlayer and player.Character then
+                        local tHrp = player.Character:FindFirstChild("HumanoidRootPart")
+                        if tHrp and (tHrp.Position - hrp.Position).Magnitude < 50 then
+                            target = tHrp
+                            break
+                        end
+                    end
+                end
+                onHit:FireServer(target, 5)
+            end)
+        end
+    end
+    
+    -- Метод 3: Все Hit эвенты подряд
+    local hitNames = {"DiamondHit", "GhostHit", "GoldenHit", "BombHit", "ReaperHit", 
+                      "SnowHit", "FlashHit", "IceHit", "PusherHit", "BrickHit",
+                      "GeneralHit", "CustomHit", "ReHit", "SlappleHit"}
+    for _, hitName in ipairs(hitNames) do
+        local hitEv = ReplicatedStorage:FindFirstChild(hitName)
+        if hitEv and hitEv:IsA("RemoteEvent") then
+            pcall(function()
+                hitEv:FireServer(hrp.Position)
+            end)
+        end
+    end
+    
+    return true
+end
+
+-- Цикл фарма
+local farmConnection
+local function startFarming()
+    farming = true
+    farmConnection = game:GetService("RunService").Heartbeat:Connect(function()
+        if not farming then return end
+        -- Используем накопительный счётчик вместо wait()
+    end)
+    
+    -- Отдельный цикл с task.wait
+    task.spawn(function()
+        while farming do
+            local success = sendHit()
+            if success then
+                hits = hits + 1
+                HitCount.Text = "Ударов: " .. hits
+            end
+            task.wait(delayTime)
+        end
+    end)
+end
+
+local function stopFarming()
+    farming = false
+    if farmConnection then
+        farmConnection:Disconnect()
+        farmConnection = nil
+    end
+end
+
+-- Кнопки
+Toggle.MouseButton1Click:Connect(function()
+    if farming then
+        stopFarming()
+        Toggle.Text = "СТАРТ ФАРМ"
+        Toggle.BackgroundColor3 = Color3.fromRGB(50, 170, 50)
+    else
+        startFarming()
+        Toggle.Text = "СТОП ФАРМ"
+        Toggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    end
+end)
+
+Faster.MouseButton1Click:Connect(function()
+    delayTime = math.max(0.1, delayTime - 0.1)
+    CountLabel.Text = "Скорость: " .. string.format("%.1f", delayTime) .. "с"
+    SpeedLabel.Text = "Задержка: " .. string.format("%.1f", delayTime) .. " сек"
+end)
+
+Slower.MouseButton1Click:Connect(function()
+    delayTime = math.min(3.0, delayTime + 0.1)
+    CountLabel.Text = "Скорость: " .. string.format("%.1f", delayTime) .. "с"
+    SpeedLabel.Text = "Задержка: " .. string.format("%.1f", delayTime) .. " сек"
+end)
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = Frame.Position
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+print("BOUNTY HIT FARM ГОТОВ")
+print("Нажимай СТАРТ для начала фарма")
+print("Регулируй скорость кнопками БЫСТРЕЕ/МЕДЛЕННЕЕ")
+print("Если слишком быстро - сервер замедлит, найди оптимальную скорость")
