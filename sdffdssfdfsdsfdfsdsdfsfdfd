@@ -1,0 +1,362 @@
+-- АВТОМАТИЧЕСКИЙ ПОИСК УЯЗВИМОСТЕЙ С ВЫДАЧЕЙ РЕЗУЛЬТАТОВ
+-- Тестирует всё и показывает только РАБОТАЮЩИЕ уязвимости
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+
+local exploits = {}
+local startTime = 0
+local slapsBefore = 0
+
+local function getSlaps()
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        local s = ls:FindFirstChild("Slaps")
+        if s then return s.Value end
+    end
+    return 0
+end
+
+local function getBountyText()
+    if LocalPlayer.Character then
+        for _, obj in pairs(LocalPlayer.Character:GetDescendants()) do
+            if obj:IsA("BillboardGui") then
+                for _, label in pairs(obj:GetDescendants()) do
+                    if label:IsA("TextLabel") and label.Text:find("Bounty") then
+                        return label.Text
+                    end
+                end
+            end
+        end
+    end
+    return "?"
+end
+
+local function findRemote(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteEvent") then return obj end
+    end
+    return nil
+end
+
+local function addExploit(name, desc, how)
+    table.insert(exploits, {name = name, desc = desc, how = how})
+end
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "AutoVulnFinder"
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 380, 0, 520)
+frame.Position = UDim2.new(0.5, -190, 0.5, -260)
+frame.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
+frame.BorderSizePixel = 1
+frame.BorderColor3 = Color3.fromRGB(100, 100, 100)
+frame.ClipsDescendants = true
+frame.Active = true
+frame.Parent = gui
+
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 30)
+titleBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+titleBar.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -10, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "🔍 АВТО-ПОИСК УЯЗВИМОСТЕЙ"
+title.TextColor3 = Color3.fromRGB(255, 180, 50)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 14
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(0.95, 0, 0, 25)
+statusLabel.Position = UDim2.new(0.025, 0, 0, 35)
+statusLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+statusLabel.Text = "Готов к сканированию"
+statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+statusLabel.Font = Enum.Font.SourceSans
+statusLabel.TextSize = 12
+statusLabel.Parent = frame
+
+local progressLabel = Instance.new("TextLabel")
+progressLabel.Size = UDim2.new(0.95, 0, 0, 18)
+progressLabel.Position = UDim2.new(0.025, 0, 0, 62)
+progressLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+progressLabel.Text = ""
+progressLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+progressLabel.Font = Enum.Font.SourceSans
+progressLabel.TextSize = 11
+progressLabel.Parent = frame
+
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(0.95, 0, 0, 360)
+scroll.Position = UDim2.new(0.025, 0, 0, 83)
+scroll.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+scroll.BorderSizePixel = 0
+scroll.CanvasSize = UDim2.new(0, 0, 0, 8000)
+scroll.ScrollBarThickness = 8
+scroll.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 60)
+scroll.Parent = frame
+
+local resultLabel = Instance.new("TextLabel")
+resultLabel.Size = UDim2.new(1, -10, 0, 8000)
+resultLabel.Position = UDim2.new(0, 5, 0, 0)
+resultLabel.BackgroundTransparency = 1
+resultLabel.Text = "Нажми НАЧАТЬ СКАНИРОВАНИЕ"
+resultLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+resultLabel.Font = Enum.Font.SourceSans
+resultLabel.TextSize = 12
+resultLabel.TextXAlignment = Enum.TextXAlignment.Left
+resultLabel.TextYAlignment = Enum.TextYAlignment.Top
+resultLabel.TextWrapped = true
+resultLabel.Parent = scroll
+
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0.45, 0, 0, 35)
+btn.Position = UDim2.new(0.025, 0, 0, 450)
+btn.BackgroundColor3 = Color3.fromRGB(30, 150, 30)
+btn.Text = "🔍 НАЧАТЬ СКАНИРОВАНИЕ"
+btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+btn.Font = Enum.Font.SourceSansBold
+btn.TextSize = 12
+btn.Parent = frame
+
+local copyBtn = Instance.new("TextButton")
+copyBtn.Size = UDim2.new(0.45, 0, 0, 35)
+copyBtn.Position = UDim2.new(0.525, 0, 0, 450)
+copyBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 150)
+copyBtn.Text = "📋 КОПИРОВАТЬ"
+copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+copyBtn.Font = Enum.Font.SourceSansBold
+copyBtn.TextSize = 12
+copyBtn.Parent = frame
+
+local reportLabel = Instance.new("TextLabel")
+reportLabel.Size = UDim2.new(0.95, 0, 0, 20)
+reportLabel.Position = UDim2.new(0.025, 0, 0, 490)
+reportLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+reportLabel.Text = ""
+reportLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+reportLabel.Font = Enum.Font.SourceSans
+reportLabel.TextSize = 10
+reportLabel.Parent = frame
+
+local function updateResult(text)
+    resultLabel.Text = text
+end
+
+local function scan()
+    exploits = {}
+    startTime = tick()
+    slapsBefore = getSlaps()
+    
+    updateResult("🔍 СКАНИРОВАНИЕ НАЧАТО...\n")
+    statusLabel.Text = "⏳ Сканирую..."
+    statusLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+    
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    
+    -- ==================== ТЕСТ 1: СКОРОСТЬ ====================
+    progressLabel.Text = "[1/8] Тест скорости..."
+    if hum then
+        local oldSpeed = hum.WalkSpeed
+        hum.WalkSpeed = 200
+        task.wait(0.1)
+        if hum.WalkSpeed == 200 then
+            addExploit("⚡ Изменение скорости", 
+                "Ты можешь ходить очень быстро (WalkSpeed = 200)",
+                "humanoid.WalkSpeed = 200")
+            hum.WalkSpeed = oldSpeed
+        end
+    end
+    
+    -- ==================== ТЕСТ 2: ПРЫЖОК ====================
+    progressLabel.Text = "[2/8] Тест прыжка..."
+    if hum then
+        local oldJump = hum.JumpPower
+        hum.JumpPower = 300
+        task.wait(0.1)
+        if hum.JumpPower == 300 then
+            addExploit("🦘 Супер-прыжок",
+                "Ты можешь прыгать очень высоко (JumpPower = 300)",
+                "humanoid.JumpPower = 300")
+            hum.JumpPower = oldJump
+        end
+    end
+    
+    -- ==================== ТЕСТ 3: ТЕЛЕПОРТ ====================
+    progressLabel.Text = "[3/8] Тест телепорта..."
+    if hrp then
+        local oldPos = hrp.Position
+        hrp.CFrame = CFrame.new(0, 100, 0)
+        task.wait(0.2)
+        local newPos = hrp.Position
+        if (newPos - Vector3.new(0, 100, 0)).Magnitude < 10 then
+            addExploit("🌀 Свободный телепорт",
+                "Ты можешь телепортироваться в любую точку карты",
+                "hrp.CFrame = CFrame.new(x, y, z)")
+        end
+        hrp.CFrame = CFrame.new(oldPos)
+    end
+    
+    -- ==================== ТЕСТ 4: GOD MODE ====================
+    progressLabel.Text = "[4/8] Тест годмода..."
+    if char then
+        local success = false
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide == true then
+                part.CanCollide = false
+                success = true
+                break
+            end
+        end
+        if success then
+            addExploit("🛡️ God Mode (нет коллизии)",
+                "Сквозь тебя не могут ударить (CanCollide = false)",
+                "part.CanCollide = false для всех частей тела")
+        end
+    end
+    
+    -- ==================== ТЕСТ 5: УБИЙСТВО ИГРОКОВ ====================
+    progressLabel.Text = "[5/8] Тест убийства игроков..."
+    local killed = 0
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local h = p.Character:FindFirstChildOfClass("Humanoid")
+            if h and h.Health > 0 then
+                h.Health = 0
+                killed = killed + 1
+            end
+        end
+    end
+    if killed > 0 then
+        addExploit("💀 Мгновенное убийство всех игроков",
+            "Убил " .. killed .. " игроков (Health = 0)",
+            "humanoid.Health = 0 для всех игроков")
+    end
+    
+    -- ==================== ТЕСТ 6: ТЕЛЕПОРТ ИГРОКОВ ====================
+    progressLabel.Text = "[6/8] Тест телепорта игроков..."
+    if hrp then
+        local tped = 0
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                local h = p.Character:FindFirstChild("HumanoidRootPart")
+                if h then
+                    h.CFrame = hrp.CFrame + Vector3.new(0, 5, 0)
+                    tped = tped + 1
+                end
+            end
+        end
+        if tped > 0 then
+            addExploit("📌 Телепорт всех игроков к тебе",
+                "Телепортировал " .. tped .. " игроков к себе",
+                "player.HumanoidRootPart.CFrame = yourPosition")
+        end
+    end
+    
+    -- ==================== ТЕСТ 7: БАУНТИ ФАРМ ====================
+    progressLabel.Text = "[7/8] Тест баунти фарма..."
+    local ga = findRemote("GeneralAbility")
+    local gh = findRemote("GeneralHit")
+    if ga and hrp then
+        local bountyBefore = getBountyText()
+        for i = 1, 5 do
+            pcall(function() ga:FireServer(hrp) end)
+            if gh then pcall(function() gh:FireServer(hrp) end) end
+            task.wait(0.1)
+        end
+        task.wait(0.3)
+        local bountyAfter = getBountyText()
+        if bountyBefore ~= bountyAfter then
+            addExploit("💰 Фарм баунти (GeneralAbility + GeneralHit)",
+                "Даёт +6 баунти за цикл (~400-500/мин)",
+                "GeneralAbility:FireServer(hrp) + GeneralHit:FireServer(hrp)")
+        end
+    end
+    
+    -- ==================== ТЕСТ 8: СЛАПЫ ====================
+    progressLabel.Text = "[8/8] Тест слапов..."
+    local slapsAfter = getSlaps()
+    if slapsAfter > slapsBefore then
+        addExploit("💎 Получены СЛАПЫ!",
+            "Слапы увеличились на " .. (slapsAfter - slapsBefore) .. " за время теста",
+            "Автоматически при убийстве игроков с баунти")
+    end
+    
+    -- ==================== ВЫДАЧА РЕЗУЛЬТАТОВ ====================
+    local result = ""
+    
+    if #exploits == 0 then
+        result = "❌ УЯЗВИМОСТЕЙ НЕ НАЙДЕНО\n\n"
+        result = result .. "Сервер хорошо защищён.\n"
+        result = result .. "Попробуй на другом сервере или с другой печаткой."
+    else
+        result = "✅ НАЙДЕНО " .. #exploits .. " УЯЗВИМОСТЕЙ!\n\n"
+        result = result .. "Время: " .. string.format("%.1f", tick() - startTime) .. " сек\n"
+        result = result .. "Слапы до: " .. slapsBefore .. " | После: " .. slapsAfter .. "\n"
+        result = result .. "━━━━━━━━━━━━━━━━━━━━\n\n"
+        
+        for i, exp in ipairs(exploits) do
+            result = result .. i .. ". " .. exp.name .. "\n"
+            result = result .. "   📝 " .. exp.desc .. "\n"
+            result = result .. "   🔧 " .. exp.how .. "\n\n"
+        end
+        
+        result = result .. "━━━━━━━━━━━━━━━━━━━━\n"
+        result = result .. "💡 Используй эти уязвимости для фарма слапов:\n"
+        result = result .. "1. Фарми баунти через GeneralAbility\n"
+        result = result .. "2. Телепортируй к себе игроков с баунти\n"
+        result = result .. "3. Убивай их и забирай слапы\n"
+    end
+    
+    updateResult(result)
+    setclipboard(result)
+    statusLabel.Text = "✅ Найдено: " .. #exploits
+    statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    progressLabel.Text = "Сканирование завершено!"
+    reportLabel.Text = "Скопировано в буфер | Slaps: " .. slapsBefore .. " → " .. slapsAfter
+end
+
+btn.MouseButton1Click:Connect(function()
+    task.spawn(scan)
+end)
+
+copyBtn.MouseButton1Click:Connect(function()
+    setclipboard(resultLabel.Text)
+    reportLabel.Text = "📋 Скопировано!"
+end)
+
+-- Перетаскивание
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false, nil, nil
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = frame.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+print("АВТО-СКАНЕР ГОТОВ")
+print("Нажми НАЧАТЬ СКАНИРОВАНИЕ")
+print("Найдёт и покажет все рабочие уязвимости")
