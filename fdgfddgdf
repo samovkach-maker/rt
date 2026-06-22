@@ -1,0 +1,104 @@
+-- ЧАСТЬ 6: ГЛУБОКИЙ АНАЛИЗ (стенды, ValidateCurrencyValue, скрытые объекты)
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local text = ""
+
+-- 1. ИССЛЕДУЕМ ПОДИУМЫ СПЕЦИАЛЬНЫХ ПЕРЧАТОК
+local specialGloves = Workspace:FindFirstChild("SpecialGloves")
+if specialGloves then
+    text = text .. "=== СТЕНДЫ (SpecialGloves) ===\n"
+    for _, podium in pairs(specialGloves:GetChildren()) do
+        text = text .. podium.Name .. ":\n"
+        -- Ищем ClickDetector
+        local cd = podium:FindFirstChildOfClass("ClickDetector")
+        if cd then
+            text = text .. "  ClickDetector найден\n"
+        end
+        -- Ищем скрипты
+        for _, script in pairs(podium:GetDescendants()) do
+            if script:IsA("Script") or script:IsA("LocalScript") or script:IsA("ModuleScript") then
+                text = text .. "  Скрипт: " .. script:GetFullName() .. "\n"
+                -- Пытаемся прочитать код
+                pcall(function()
+                    local src = script.Source
+                    if src and #src < 200 then
+                        text = text .. "    Код: " .. src:gsub("\n", " ") .. "\n"
+                    end
+                end)
+            end
+        end
+        -- Ищем любые Value объекты
+        for _, obj in pairs(podium:GetDescendants()) do
+            if obj:IsA("IntValue") or obj:IsA("StringValue") or obj:IsA("NumberValue") then
+                text = text .. "  Value: " .. obj.Name .. " = " .. tostring(obj.Value) .. "\n"
+            end
+        end
+    end
+end
+
+-- 2. ИЩЕМ ДРУГИЕ ВОЗМОЖНЫЕ МАГАЗИНЫ ИЛИ КНОПКИ В WORKSPACE
+text = text .. "\n=== ДРУГИЕ ОБЪЕКТЫ В WORKSPACE ===\n"
+for _, obj in pairs(Workspace:GetDescendants()) do
+    if obj:IsA("ClickDetector") then
+        text = text .. "ClickDetector: " .. obj.Parent:GetFullName() .. "\n"
+    end
+    if obj:IsA("ProximityPrompt") then
+        text = text .. "ProximityPrompt: " .. obj.Parent:GetFullName() .. "\n"
+    end
+    if obj:IsA("Tool") and obj.Name:lower():find("glove") then
+        text = text .. "Tool: " .. obj:GetFullName() .. "\n"
+    end
+end
+
+-- 3. ТЕСТ ValidateCurrencyValue С АРГУМЕНТАМИ
+local vcv = nil
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj.Name == "ValidateCurrencyValue" and obj:IsA("RemoteFunction") then
+        vcv = obj
+        break
+    end
+end
+if vcv then
+    text = text .. "\n=== ValidateCurrencyValue ===\n"
+    local tests = {
+        {"без аргументов", {}},
+        {"число 100", {100}},
+        {"строка 'Cash'", {"Cash"}},
+        {"'Cash', 100", {"Cash", 100}},
+        {"'Gold', 10", {"Gold", 10}},
+        {"LocalPlayer", {LocalPlayer}},
+    }
+    for _, t in ipairs(tests) do
+        local ok, res = pcall(function() return vcv:InvokeServer(unpack(t[2])) end)
+        text = text .. t[1] .. ": " .. tostring(res) .. "\n"
+        task.wait(0.1)
+    end
+end
+
+-- 4. ChangeSetting
+local cs = nil
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj.Name == "ChangeSetting" and obj:IsA("RemoteFunction") then
+        cs = obj
+        break
+    end
+end
+if cs then
+    text = text .. "\n=== ChangeSetting ===\n"
+    pcall(function() cs:InvokeServer("UnlockAll") end)
+    pcall(function() cs:InvokeServer("GiveAll") end)
+    text = text .. "Попытки UnlockAll/GiveAll\n"
+end
+
+-- 5. ПРОВЕРКА ВСЕХ REMOTE НА СКРЫТЫЕ НАЗВАНИЯ
+text = text .. "\n=== ВСЕ REMOTE (повторный поиск) ===\n"
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+        text = text .. obj.ClassName .. ": " .. obj:GetFullName() .. "\n"
+    end
+end
+
+setclipboard(text)
+print(text)
+print("Скопировано!")
