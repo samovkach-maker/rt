@@ -1,0 +1,52 @@
+-- ЧАСТЬ 5: ПРОВЕРКА ВАЛЮТЫ И ТЕСТ REQUESTGLOVETRY
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local text = ""
+
+-- 1. ТОЧНОЕ ИЗМЕНЕНИЕ ВАЛЮТЫ
+local ls = LocalPlayer:FindFirstChild("leaderstats")
+if ls then
+    text = text .. "=== ВАЛЮТА (точная проверка) ===\n"
+    for _, stat in pairs(ls:GetChildren()) do
+        if stat:IsA("IntValue") then
+            local old = stat.Value
+            stat.Value = 999999
+            task.wait(0.1)
+            local new = stat.Value
+            text = text .. stat.Name .. ": " .. old .. " -> " .. new .. " (изменилось? " .. tostring(old ~= new) .. ")\n"
+        end
+    end
+else
+    text = text .. "leaderstats НЕ НАЙДЕН!\n"
+end
+
+-- 2. RequestGloveTry
+local rgt = nil
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj.Name == "RequestGloveTry" and obj:IsA("RemoteFunction") then
+        rgt = obj
+        break
+    end
+end
+
+if rgt then
+    text = text .. "\n=== REQUESTGLOVETRY ===\n"
+    local gloves = {"Golden Minigun", "RPG", "Money Glove", "Dark Energy Glove", "Lightning Glove"}
+    for _, glove in ipairs(gloves) do
+        local ok, res = pcall(function() return rgt:InvokeServer(glove) end)
+        text = text .. glove .. ": " .. tostring(res) .. "\n"
+        task.wait(0.1)
+    end
+else
+    text = text .. "RequestGloveTry не найден\n"
+end
+
+-- 3. Проверка CurrentGlove после RequestGloveTry
+local cg = LocalPlayer:FindFirstChild("CurrentGlove")
+if cg and cg:IsA("StringValue") then
+    text = text .. "\nCurrentGlove после тестов: " .. cg.Value .. "\n"
+end
+
+setclipboard(text)
+print(text)
+print("Скопировано!")
