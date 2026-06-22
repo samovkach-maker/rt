@@ -1,0 +1,85 @@
+-- ЧАСТЬ 7: ГЛУБОКИЙ ТЕСТ Rebirth, ShowCashGain, манипуляция Wins
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local text = ""
+
+-- 1. Пробуем разные варианты RebirthRequestEvent
+local rebEvent = nil
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj.Name == "RebirthRequestEvent" and obj:IsA("RemoteEvent") then
+        rebEvent = obj
+        break
+    end
+end
+
+if rebEvent then
+    text = text .. "=== REBIRTH ТЕСТ ===\n"
+    -- Возможно, есть функция, которая проверяет, достаточно ли у нас "Wins" для возрождения
+    -- Пробуем вызвать с числом, строкой и таблицей
+    local tests = {
+        {1},
+        {10},
+        {100},
+        {"prestige"},
+        {"reset"},
+        {{times = 10}},
+        {{action = "rebirth"}}
+    }
+    for _, args in ipairs(tests) do
+        pcall(function() rebEvent:FireServer(unpack(args)) end)
+        text = text .. "Rebirth с аргументами: " .. tostring(args[1]) .. "\n"
+        task.wait(0.1)
+    end
+end
+
+-- 2. Пробуем вызвать ShowCashGain с числом (вдруг прибавит валюту)
+local cashEvent = nil
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj.Name == "ShowCashGain" and obj:IsA("RemoteEvent") then
+        cashEvent = obj
+        break
+    end
+end
+if cashEvent then
+    text = text .. "\n=== CASH GAIN ===\n"
+    pcall(function() cashEvent:FireServer(99999) end)
+    pcall(function() cashEvent:FireServer({amount = 99999}) end)
+    text = text .. "Запросы на выдачу Cash отправлены\n"
+end
+
+-- 3. Прямая манипуляция Wins (если это NumberValue, а не IntValue)
+local ls = LocalPlayer:FindFirstChild("leaderstats")
+if ls then
+    local wins = ls:FindFirstChild("Wins")
+    if wins then
+        text = text .. "\n=== WINS МАНИПУЛЯЦИЯ ===\n"
+        text = text .. "Тип: " .. wins.ClassName .. "\n"
+        local old = wins.Value
+        -- Пробуем установить через pcall, возможно, это NumberValue с ограничением
+        pcall(function() wins.Value = 9999 end)
+        task.wait(0.2)
+        text = text .. "Было: " .. old .. ", Стало: " .. wins.Value .. "\n"
+        if wins.Value == 9999 then
+            text = text .. "Wins изменены! Попробуй купить что-нибудь.\n"
+        end
+    end
+end
+
+-- 4. Поиск любых других Folder у LocalPlayer, которые могли появиться после тестов
+text = text .. "\n=== ПАПКИ ИГРОКА ===\n"
+for _, child in pairs(LocalPlayer:GetChildren()) do
+    if child:IsA("Folder") then
+        text = text .. child.Name .. ":\n"
+        for _, sub in pairs(child:GetChildren()) do
+            pcall(function()
+                if sub:IsA("BoolValue") or sub:IsA("IntValue") or sub:IsA("StringValue") then
+                    text = text .. "  " .. sub.Name .. " = " .. tostring(sub.Value) .. "\n"
+                end
+            end)
+        end
+    end
+end
+
+setclipboard(text)
+print(text)
+print("Скопировано! Проверь, изменились ли Wins или появились ли новые предметы после Rebirth.")
