@@ -1,0 +1,86 @@
+-- ЧАСТЬ 8: ТОЧНАЯ МАНИПУЛЯЦИЯ ВАЛЮТОЙ, DAILY REWARD, КВЕСТЫ
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local text = ""
+
+-- 1. Точное определение и изменение валюты
+local ls = LocalPlayer:FindFirstChild("leaderstats")
+if ls then
+    text = text .. "=== ВАЛЮТА (типы и значения) ===\n"
+    for _, stat in pairs(ls:GetChildren()) do
+        text = text .. stat.Name .. " [" .. stat.ClassName .. "] = " .. tostring(stat.Value) .. "\n"
+        -- Пробуем менять независимо от типа
+        local old = stat.Value
+        pcall(function() stat.Value = 999999 end)
+        task.wait(0.1)
+        local new = stat.Value
+        if new == 999999 then
+            text = text .. "  -> успешно изменено!\n"
+        else
+            text = text .. "  -> НЕ изменилось (сервер вернул " .. tostring(new) .. ")\n"
+        end
+    end
+end
+
+-- 2. DailyReward: сброс и попытка забрать
+local daily = LocalPlayer:FindFirstChild("DailyReward")
+if daily then
+    text = text .. "\n=== DAILY REWARD ===\n"
+    local time = daily:FindFirstChild("LastClaimedTime")
+    local day = daily:FindFirstChild("LastClaimed")
+    if time then time.Value = 0; text = text .. "LastClaimedTime сброшен\n" end
+    if day then day.Value = 0; text = text .. "LastClaimed сброшен\n" end
+    
+    -- Ищем функцию для клейма
+    local claimFunc = nil
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == "ClaimDailyReward" or obj.Name == "DailyClaim" then
+            claimFunc = obj
+            break
+        end
+    end
+    if claimFunc then
+        local ok, res = pcall(function() return claimFunc:InvokeServer() end)
+        text = text .. "Claim: " .. tostring(res) .. "\n"
+    else
+        text = text .. "Функция клейма не найдена\n"
+    end
+end
+
+-- 3. Квесты
+local quests = LocalPlayer:FindFirstChild("QuestsToChoose")
+if quests then
+    text = text .. "\n=== КВЕСТЫ ===\n"
+    for _, child in pairs(quests:GetChildren()) do
+        if child:IsA("StringValue") then
+            text = text .. child.Name .. " = " .. child.Value .. "\n"
+        end
+    end
+    -- Пробуем завершить квест
+    local questRemote = nil
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == "CompleteQuest" or obj.Name == "FinishQuest" then
+            questRemote = obj
+            break
+        end
+    end
+    if questRemote then
+        pcall(function() questRemote:FireServer("Easy") end)
+        text = text .. "Попытка завершить Easy квест\n"
+    end
+end
+
+-- 4. Поиск всех Remote в Signal
+text = text .. "\n=== REMOTE В SIGNAL ===\n"
+local signal = ReplicatedStorage:FindFirstChild("Signal")
+if signal then
+    for _, obj in pairs(signal:GetDescendants()) do
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+            text = text .. obj.ClassName .. ": " .. obj:GetFullName() .. "\n"
+        end
+    end
+end
+
+setclipboard(text)
+print(text)
+print("Скопировано!")
