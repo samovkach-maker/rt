@@ -1,0 +1,111 @@
+-- ЧАСТЬ 5: Исследование UnitsShowroom, ToolsShowroom, LobbyPads + поиск данных о пасах/юнитах
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local text = ""
+
+-- 1. UnitsShowroom
+local units = Workspace:FindFirstChild("UnitsShowroom")
+if units then
+    text = text .. "=== UnitsShowroom ===\n"
+    for _, obj in pairs(units:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") then
+            text = text .. "ProximityPrompt: " .. obj.Parent:GetFullName() .. "\n"
+        end
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+            text = text .. obj.ClassName .. ": " .. obj:GetFullName() .. "\n"
+        end
+        if obj:IsA("IntValue") or obj:IsA("StringValue") or obj:IsA("NumberValue") then
+            text = text .. "Value: " .. obj.Name .. " = " .. tostring(obj.Value) .. "\n"
+        end
+    end
+end
+
+-- 2. ToolsShowroom
+local tools = Workspace:FindFirstChild("ToolsShowroom")
+if tools then
+    text = text .. "\n=== ToolsShowroom ===\n"
+    for _, obj in pairs(tools:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") then
+            text = text .. "ProximityPrompt: " .. obj.Parent:GetFullName() .. "\n"
+        end
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+            text = text .. obj.ClassName .. ": " .. obj:GetFullName() .. "\n"
+        end
+        if obj:IsA("IntValue") or obj:IsA("StringValue") or obj:IsA("NumberValue") then
+            text = text .. "Value: " .. obj.Name .. " = " .. tostring(obj.Value) .. "\n"
+        end
+    end
+end
+
+-- 3. LobbyPads
+local pads = Workspace:FindFirstChild("LobbyPads")
+if pads then
+    text = text .. "\n=== LobbyPads ===\n"
+    for _, obj in pairs(pads:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") then
+            text = text .. "ProximityPrompt: " .. obj.Parent:GetFullName() .. "\n"
+        end
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+            text = text .. obj.ClassName .. ": " .. obj:GetFullName() .. "\n"
+        end
+        if obj:IsA("IntValue") or obj:IsA("StringValue") or obj:IsA("NumberValue") then
+            text = text .. "Value: " .. obj.Name .. " = " .. tostring(obj.Value) .. "\n"
+        end
+        if obj:IsA("ClickDetector") then
+            text = text .. "ClickDetector: " .. obj.Parent:GetFullName() .. "\n"
+        end
+    end
+end
+
+-- 4. Поиск данных о пасах/юнитах/инструментах у игрока
+text = text .. "\n=== ДАННЫЕ ИГРОКА ===\n"
+for _, child in pairs(LocalPlayer:GetChildren()) do
+    if child:IsA("Folder") and child.Name ~= "leaderstats" then
+        text = text .. child.Name .. ":\n"
+        for _, sub in pairs(child:GetChildren()) do
+            pcall(function()
+                if sub:IsA("BoolValue") or sub:IsA("IntValue") or sub:IsA("StringValue") then
+                    text = text .. "  " .. sub.Name .. " = " .. tostring(sub.Value) .. "\n"
+                else
+                    text = text .. "  " .. sub.Name .. " [" .. sub.ClassName .. "]\n"
+                end
+            end)
+        end
+    end
+end
+
+-- 5. Вызов ключевых RemoteEvent с аргументами
+text = text .. "\n=== ТЕСТ КЛЮЧЕВЫХ REMOTEEVENT ===\n"
+local eventsToTest = {
+    "RequestUpgrade",
+    "BuyEquipSkinEvent",
+    "BuyEquipSlapToolEvent",
+    "RebirthRequestEvent",
+    "EquipCustomTool",
+    "SetCustomSpeedEvent",
+}
+
+for _, eventName in ipairs(eventsToTest) do
+    local ev = nil
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == eventName and obj:IsA("RemoteEvent") then
+            ev = obj
+            break
+        end
+    end
+    if ev then
+        text = text .. eventName .. ":\n"
+        pcall(function() ev:FireServer() end)
+        pcall(function() ev:FireServer(LocalPlayer) end)
+        pcall(function() ev:FireServer(1) end)
+        pcall(function() ev:FireServer("buy") end)
+        text = text .. "  вызовы отправлены\n"
+    else
+        text = text .. eventName .. ": не найден\n"
+    end
+end
+
+setclipboard(text)
+print(text)
+print("Скопировано!")
