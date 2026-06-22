@@ -1,0 +1,65 @@
+-- ЧАСТЬ 7: ТЕСТ ВАЛИДАЦИИ ВАЛЮТЫ И ПОКУПКИ
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local text = ""
+
+-- 1. ValidateCurrencyValue с таблицами
+local vcv = nil
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj.Name == "ValidateCurrencyValue" and obj:IsA("RemoteFunction") then
+        vcv = obj
+        break
+    end
+end
+
+if vcv then
+    text = text .. "=== ValidateCurrencyValue (таблицы) ===\n"
+    local tests = {
+        {"таблица {Cash, 100}", {{"Cash", 100}}},
+        {"таблица {Gold, 10}", {{"Gold", 10}}},
+        {"таблица {Cash, 0}", {{"Cash", 0}}},
+        {"таблица с LocalPlayer", {{LocalPlayer, "Cash", 100}}},
+        {"пустая таблица", {{}}},
+    }
+    for _, t in ipairs(tests) do
+        local ok, res = pcall(function() return vcv:InvokeServer(unpack(t[2])) end)
+        text = text .. t[1] .. ": " .. tostring(res) .. "\n"
+        task.wait(0.1)
+    end
+end
+
+-- 2. ChangeSetting с разными настройками
+local cs = nil
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj.Name == "ChangeSetting" and obj:IsA("RemoteFunction") then
+        cs = obj
+        break
+    end
+end
+if cs then
+    text = text .. "\n=== ChangeSetting (разные аргументы) ===\n"
+    local settings = {"UnlockAllGloves", "GiveAllGloves", "AddCash", "AddGold", "ResetQuests", "VIP"}
+    for _, s in ipairs(settings) do
+        local ok, res = pcall(function() return cs:InvokeServer(s) end)
+        text = text .. s .. ": " .. tostring(res) .. "\n"
+        task.wait(0.1)
+    end
+    -- пробуем с числовыми значениями
+    pcall(function() cs:InvokeServer("Cash", 999999) end)
+    pcall(function() cs:InvokeServer("Gold", 999999) end)
+    text = text .. "Попытки с валютами\n"
+end
+
+-- 3. Поиск скрытых RemoteEvent/Function в SpecialGloves
+text = text .. "\n=== СКРЫТЫЕ REMOTE В SPECIALGLOVES ===\n"
+local specialGloves = workspace:FindFirstChild("SpecialGloves")
+if specialGloves then
+    for _, obj in pairs(specialGloves:GetDescendants()) do
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+            text = text .. obj.ClassName .. ": " .. obj:GetFullName() .. "\n"
+        end
+    end
+end
+
+setclipboard(text)
+print(text)
+print("Скопировано!")
