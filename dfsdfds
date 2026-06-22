@@ -1,0 +1,74 @@
+-- ЧАСТЬ 6: ТЕСТ Rebirth, CustomSpeed, RoundReward, Ability
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local text = ""
+
+local function findEvent(name)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteEvent") then return obj end
+    end
+    return nil
+end
+
+-- 1. RebirthRequestEvent (возрождение, может давать бонусы)
+local reb = findEvent("RebirthRequestEvent")
+if reb then
+    text = text .. "=== REBIRTH ===\n"
+    -- Пробуем разные аргументы: число возрождений, строку, таблицу
+    pcall(function() reb:FireServer(1) end)
+    pcall(function() reb:FireServer(100) end)
+    pcall(function() reb:FireServer("max") end)
+    pcall(function() reb:FireServer({amount = 100}) end)
+    text = text .. "Rebirth запросы отправлены\n"
+end
+
+-- 2. SetCustomSpeedEvent (кастомная скорость)
+local speedEv = findEvent("SetCustomSpeedEvent")
+if speedEv then
+    text = text .. "\n=== CUSTOM SPEED ===\n"
+    pcall(function() speedEv:FireServer(999) end)  -- огромная скорость
+    pcall(function() speedEv:FireServer({speed = 500}) end)
+    pcall(function() speedEv:FireServer("max") end)
+    text = text .. "Запросы на кастомную скорость отправлены\n"
+end
+
+-- 3. ShowRoundReward (награда за раунд)
+local rewardEv = findEvent("ShowRoundReward")
+if rewardEv then
+    text = text .. "\n=== ROUND REWARD ===\n"
+    pcall(function() rewardEv:FireServer() end)
+    pcall(function() rewardEv:FireServer(1000) end)
+    text = text .. "Запросы на награду отправлены\n"
+end
+
+-- 4. UseAbility / PlayAbilityVFX (способности юнитов)
+local abilityEv = findEvent("UseAbility") or findEvent("PlayAbilityVFX")
+if abilityEv then
+    text = text .. "\n=== ABILITY ===\n"
+    pcall(function() abilityEv:FireServer("Ultimate") end)
+    pcall(function() abilityEv:FireServer("Super") end)
+    text = text .. "Запросы способностей отправлены\n"
+end
+
+-- 5. EquipCustomTool (экипировка кастомного инструмента)
+local toolEv = findEvent("EquipCustomTool")
+if toolEv then
+    text = text .. "\n=== CUSTOM TOOL ===\n"
+    pcall(function() toolEv:FireServer("Golden Gun") end)
+    pcall(function() toolEv:FireServer("Admin Tool") end)
+    pcall(function() toolEv:FireServer(1) end)
+    text = text .. "Запросы на экипировку отправлены\n"
+end
+
+-- Проверка, изменились ли лидерстаты/данные
+local ls = LocalPlayer:FindFirstChild("leaderstats")
+if ls then
+    text = text .. "\n=== LEADERSTATS ПОСЛЕ ТЕСТОВ ===\n"
+    for _, stat in pairs(ls:GetChildren()) do
+        pcall(function() text = text .. stat.Name .. " = " .. tostring(stat.Value) .. "\n" end)
+    end
+end
+
+setclipboard(text)
+print(text)
+print("Скопировано! Проверь, изменилось ли что-то в инвентаре/статистике.")
