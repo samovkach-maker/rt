@@ -1,0 +1,75 @@
+-- ЧАСТЬ 4: МАНИПУЛЯЦИИ
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local Workspace = game:GetService("Workspace")
+local text = ""
+
+-- 1. Разблокируем ВСЕ перчатки в UnlockedGloves
+local unlocked = LocalPlayer:FindFirstChild("UnlockedGloves")
+if unlocked then
+    text = text .. "=== РАЗБЛОКИРОВКА ПЕРЧАТОК ===\n"
+    for _, glove in pairs(unlocked:GetChildren()) do
+        if glove:IsA("BoolValue") then
+            text = text .. glove.Name .. " было: " .. tostring(glove.Value) .. "\n"
+            glove.Value = true
+            text = text .. "  стало: true\n"
+        end
+    end
+end
+
+-- 2. Меняем валюту
+local ls = LocalPlayer:FindFirstChild("leaderstats")
+if ls then
+    text = text .. "\n=== ВАЛЮТА ===\n"
+    for _, stat in pairs(ls:GetChildren()) do
+        if stat:IsA("IntValue") then
+            text = text .. stat.Name .. " было: " .. stat.Value .. "\n"
+            stat.Value = 999999
+            text = text .. "  стало: " .. stat.Value .. "\n"
+        end
+    end
+end
+
+-- 3. Сбрасываем DailyReward
+local daily = LocalPlayer:FindFirstChild("DailyReward")
+if daily then
+    text = text .. "\n=== DAILY REWARD ===\n"
+    local time = daily:FindFirstChild("LastClaimedTime")
+    local day = daily:FindFirstChild("LastClaimed")
+    if time then
+        text = text .. "LastClaimedTime было: " .. time.Value .. "\n"
+        time.Value = 0
+        text = text .. "  стало: 0\n"
+    end
+    if day then
+        text = text .. "LastClaimed было: " .. day.Value .. "\n"
+        day.Value = 0
+        text = text .. "  стало: 0\n"
+    end
+end
+
+-- 4. Активируем ProximityPrompt у специальных перчаток
+text = text .. "\n=== АКТИВАЦИЯ SPECIAL GLOVES ===\n"
+local specialGloves = Workspace:FindFirstChild("SpecialGloves")
+if specialGloves then
+    for _, obj in pairs(specialGloves:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") then
+            text = text .. obj.Parent.Name .. "\n"
+            for i = 1, 10 do
+                pcall(function() fireproximityprompt(obj) end)
+            end
+        end
+    end
+end
+
+-- 5. Меняем CurrentGlove на что-то крутое
+local currentGlove = LocalPlayer:FindFirstChild("CurrentGlove")
+if currentGlove and currentGlove:IsA("StringValue") then
+    text = text .. "\n=== CURRENT GLOVE ===\n"
+    text = text .. "Было: " .. currentGlove.Value .. "\n"
+    currentGlove.Value = "Golden Minigun"  -- мощная перчатка
+    text = text .. "Стало: " .. currentGlove.Value .. "\n"
+end
+
+setclipboard(text)
+print(text)
+print("Скопировано! Проверь инвентарь и попробуй купить/экипировать перчатки.")
