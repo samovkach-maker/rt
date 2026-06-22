@@ -1,75 +1,52 @@
--- ЧАСТЬ 4: МАНИПУЛЯЦИИ
+-- ЧАСТЬ 5: ПРОВЕРКА ВАЛЮТЫ И ТЕСТ REQUESTGLOVETRY
 local LocalPlayer = game:GetService("Players").LocalPlayer
-local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local text = ""
 
--- 1. Разблокируем ВСЕ перчатки в UnlockedGloves
-local unlocked = LocalPlayer:FindFirstChild("UnlockedGloves")
-if unlocked then
-    text = text .. "=== РАЗБЛОКИРОВКА ПЕРЧАТОК ===\n"
-    for _, glove in pairs(unlocked:GetChildren()) do
-        if glove:IsA("BoolValue") then
-            text = text .. glove.Name .. " было: " .. tostring(glove.Value) .. "\n"
-            glove.Value = true
-            text = text .. "  стало: true\n"
-        end
-    end
-end
-
--- 2. Меняем валюту
+-- 1. ТОЧНОЕ ИЗМЕНЕНИЕ ВАЛЮТЫ
 local ls = LocalPlayer:FindFirstChild("leaderstats")
 if ls then
-    text = text .. "\n=== ВАЛЮТА ===\n"
+    text = text .. "=== ВАЛЮТА (точная проверка) ===\n"
     for _, stat in pairs(ls:GetChildren()) do
         if stat:IsA("IntValue") then
-            text = text .. stat.Name .. " было: " .. stat.Value .. "\n"
+            local old = stat.Value
             stat.Value = 999999
-            text = text .. "  стало: " .. stat.Value .. "\n"
+            task.wait(0.1)
+            local new = stat.Value
+            text = text .. stat.Name .. ": " .. old .. " -> " .. new .. " (изменилось? " .. tostring(old ~= new) .. ")\n"
         end
     end
+else
+    text = text .. "leaderstats НЕ НАЙДЕН!\n"
 end
 
--- 3. Сбрасываем DailyReward
-local daily = LocalPlayer:FindFirstChild("DailyReward")
-if daily then
-    text = text .. "\n=== DAILY REWARD ===\n"
-    local time = daily:FindFirstChild("LastClaimedTime")
-    local day = daily:FindFirstChild("LastClaimed")
-    if time then
-        text = text .. "LastClaimedTime было: " .. time.Value .. "\n"
-        time.Value = 0
-        text = text .. "  стало: 0\n"
-    end
-    if day then
-        text = text .. "LastClaimed было: " .. day.Value .. "\n"
-        day.Value = 0
-        text = text .. "  стало: 0\n"
+-- 2. RequestGloveTry
+local rgt = nil
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj.Name == "RequestGloveTry" and obj:IsA("RemoteFunction") then
+        rgt = obj
+        break
     end
 end
 
--- 4. Активируем ProximityPrompt у специальных перчаток
-text = text .. "\n=== АКТИВАЦИЯ SPECIAL GLOVES ===\n"
-local specialGloves = Workspace:FindFirstChild("SpecialGloves")
-if specialGloves then
-    for _, obj in pairs(specialGloves:GetDescendants()) do
-        if obj:IsA("ProximityPrompt") then
-            text = text .. obj.Parent.Name .. "\n"
-            for i = 1, 10 do
-                pcall(function() fireproximityprompt(obj) end)
-            end
-        end
+if rgt then
+    text = text .. "\n=== REQUESTGLOVETRY ===\n"
+    local gloves = {"Golden Minigun", "RPG", "Money Glove", "Dark Energy Glove", "Lightning Glove"}
+    for _, glove in ipairs(gloves) do
+        local ok, res = pcall(function() return rgt:InvokeServer(glove) end)
+        text = text .. glove .. ": " .. tostring(res) .. "\n"
+        task.wait(0.1)
     end
+else
+    text = text .. "RequestGloveTry не найден\n"
 end
 
--- 5. Меняем CurrentGlove на что-то крутое
-local currentGlove = LocalPlayer:FindFirstChild("CurrentGlove")
-if currentGlove and currentGlove:IsA("StringValue") then
-    text = text .. "\n=== CURRENT GLOVE ===\n"
-    text = text .. "Было: " .. currentGlove.Value .. "\n"
-    currentGlove.Value = "Golden Minigun"  -- мощная перчатка
-    text = text .. "Стало: " .. currentGlove.Value .. "\n"
+-- 3. Проверка CurrentGlove после RequestGloveTry
+local cg = LocalPlayer:FindFirstChild("CurrentGlove")
+if cg and cg:IsA("StringValue") then
+    text = text .. "\nCurrentGlove после тестов: " .. cg.Value .. "\n"
 end
 
 setclipboard(text)
 print(text)
-print("Скопировано! Проверь инвентарь и попробуй купить/экипировать перчатки.")
+print("Скопировано!")
