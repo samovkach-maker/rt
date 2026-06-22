@@ -1,0 +1,109 @@
+-- ФИНАЛЬНАЯ ДИАГНОСТИКА: Скрытые валюты, Rebirth-бонусы и авто-фарм
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local text = ""
+
+-- 1. ПОИСК СКРЫТЫХ ВАЛЮТ (могут быть в других папках)
+text = text .. "=== ПОИСК ВСЕХ ЧИСЛОВЫХ ЗНАЧЕНИЙ ===\n"
+for _, child in pairs(LocalPlayer:GetChildren()) do
+    if child:IsA("Folder") and child.Name ~= "leaderstats" then
+        text = text .. child.Name .. ":\n"
+        for _, sub in pairs(child:GetDescendants()) do
+            if sub:IsA("IntValue") or sub:IsA("NumberValue") or sub:IsA("DoubleConstrainedValue") then
+                text = text .. "  " .. sub:GetFullName() .. " = " .. tostring(sub.Value) .. "\n"
+            end
+        end
+    end
+end
+
+-- 2. ТЕСТ REBIRTH НА СКРЫТЫЕ БОНУСЫ
+local rebEvent = nil
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj.Name == "RebirthRequestEvent" and obj:IsA("RemoteEvent") then
+        rebEvent = obj
+        break
+    end
+end
+
+if rebEvent then
+    text = text .. "\n=== REBIRTH ТЕСТ ===\n"
+    local oldWins = LocalPlayer.leaderstats.Wins.Value
+    -- Выполняем возрождение 1 раз
+    pcall(function() rebEvent:FireServer(1) end)
+    task.wait(0.5)
+    
+    -- Проверяем, что изменилось
+    local newWins = LocalPlayer.leaderstats.Wins.Value
+    text = text .. "Wins: " .. oldWins .. " -> " .. newWins .. "\n"
+    
+    -- Ищем новые объекты
+    for _, child in pairs(LocalPlayer:GetChildren()) do
+        if child:IsA("Folder") and not child:FindFirstChild("leaderstats") then
+            for _, sub in pairs(child:GetDescendants()) do
+                if sub:IsA("IntValue") or sub:IsA("NumberValue") then
+                    text = text .. "Новое значение: " .. sub:GetFullName() .. " = " .. tostring(sub.Value) .. "\n"
+                end
+            end
+        end
+    end
+end
+
+-- 3. АВТО-ФАРМ WINS (если игра PvP/PvE)
+-- Попробуем автоматизировать матч: телепортироваться к врагам/базе
+text = text .. "\n=== АВТО-ФАРМ ТЕСТ ===\n"
+local base = Workspace:FindFirstChild("Base") or Workspace:FindFirstChild("EnemyBase")
+if base then
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        hrp.CFrame = base.CFrame + Vector3.new(0, 5, 0)
+        text = text .. "Телепорт к базе\n"
+    end
+else
+    text = text .. "База не найдена, ищем врагов...\n"
+    -- Ищем юнитов с ProximityPrompt (из UnitsShowroom)
+    for _, obj in pairs(Workspace.UnitsShowroom:GetDescendants()) do
+        if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.CFrame = obj.HumanoidRootPart.CFrame + Vector3.new(0, 5, 0)
+                text = text .. "Телепорт к " .. obj.Name .. "\n"
+                break
+            end
+        end
+    end
+end
+
+-- 4. ПОПЫТКА ВЫЗВАТЬ МАТЧ (UseAbility, PlayAbilityVFX)
+local abilityEvent = nil
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj.Name == "UseAbility" and obj:IsA("RemoteEvent") then
+        abilityEvent = obj
+        break
+    end
+end
+if abilityEvent then
+    text = text .. "\nПопытка использовать способности...\n"
+    pcall(function() abilityEvent:FireServer("Attack") end)
+    pcall(function() abilityEvent:FireServer("Ultimate") end)
+end
+
+-- 5. ФИНАЛЬНАЯ ПОПЫТКА ДОБАВИТЬ ВАЛЮТУ ЧЕРЕЗ ShowCashGain (с таймером)
+local cashEvent = nil
+for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+    if obj.Name == "ShowCashGain" and obj:IsA("RemoteEvent") then
+        cashEvent = obj
+        break
+    end
+end
+if cashEvent then
+    text = text .. "\nСпам ShowCashGain с интервалом 0.5 сек...\n"
+    for i = 1, 10 do
+        pcall(function() cashEvent:FireServer(500) end)
+        task.wait(0.5)
+    end
+end
+
+setclipboard(text)
+print(text)
+print("Скопировано! Проверь, появились ли новые юниты/валюты и работает ли авто-фарм.")
