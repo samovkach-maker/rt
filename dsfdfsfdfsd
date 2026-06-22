@@ -1,0 +1,67 @@
+-- ИМИТАЦИЯ ПОБЕДЫ: вызов событий, связанных с победой и наградой
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = game:GetService("Players").LocalPlayer
+local text = ""
+
+local function fireEvent(name, ...)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj.Name == name and obj:IsA("RemoteEvent") then
+            pcall(function() obj:FireServer(...) end)
+            return true
+        end
+    end
+    return false
+end
+
+-- 1. WinnerDanceEvent (танец победителя)
+text = text .. "WinnerDanceEvent:\n"
+fireEvent("WinnerDanceEvent")
+fireEvent("WinnerDanceEvent", LocalPlayer)
+fireEvent("WinnerDanceEvent", "win")
+text = text .. "  вызовы отправлены\n\n"
+
+-- 2. MatchEventMessage (сообщение о событии матча - возможно, "победа")
+text = text .. "MatchEventMessage:\n"
+fireEvent("MatchEventMessage", "Victory")
+fireEvent("MatchEventMessage", "Win")
+fireEvent("MatchEventMessage", "PlayerWon")
+fireEvent("MatchEventMessage", LocalPlayer, "Win")
+text = text .. "  вызовы отправлены\n\n"
+
+-- 3. ShowRoundReward (награда за раунд)
+text = text .. "ShowRoundReward:\n"
+fireEvent("ShowRoundReward", "win")
+fireEvent("ShowRoundReward", 1)
+fireEvent("ShowRoundReward", LocalPlayer)
+text = text .. "  вызовы отправлены\n\n"
+
+-- 4. RebirthRequestEvent с параметром "win" или "victory"
+text = text .. "RebirthRequestEvent:\n"
+fireEvent("RebirthRequestEvent", "win")
+fireEvent("RebirthRequestEvent", "victory")
+fireEvent("RebirthRequestEvent", {result = "win"})
+text = text .. "  вызовы отправлены\n\n"
+
+-- 5. UseAbility с атакой (возможно, убийство врага дает победу)
+text = text .. "UseAbility (атака):\n"
+fireEvent("UseAbility", "Kill")
+fireEvent("UseAbility", "Destroy")
+fireEvent("UseAbility", "Finish")
+text = text .. "  вызовы отправлены\n\n"
+
+-- Проверка Wins после тестов
+task.wait(1)
+local ls = LocalPlayer:FindFirstChild("leaderstats")
+if ls then
+    local wins = ls:FindFirstChild("Wins")
+    if wins then
+        text = text .. "=== РЕЗУЛЬТАТ ===\nWins: " .. wins.Value .. " (было 0)\n"
+        if wins.Value > 0 then
+            text = text .. "УСПЕХ! Победы засчитаны!\n"
+        end
+    end
+end
+
+setclipboard(text)
+print(text)
+print("Скопировано! Проверь вкладку Wins.")
